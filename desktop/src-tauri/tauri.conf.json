@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis"],
+    "licenseFile": "windows/KOSULLAR.rtf",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,8 +36,7 @@
     ],
     "windows": {
       "webviewInstallMode": { "type": "offlineInstaller" },
-      "nsis": { "installerHooks": "windows/hooks.nsh", "licenseFile": "windows/KOSULLAR.rtf" },
-      "wix": { "licenseFile": "windows/KOSULLAR.rtf" }
+      "nsis": { "installerHooks": "windows/hooks.nsh" }
     }
   }
 }

@@ -26,6 +26,8 @@ def test_guide_copies_are_in_sync_with_source():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     for path, content in mod.outputs().items():
+        if not path.parent.exists():  # açık depoda site/ yok (TAKIP 1.106)
+            continue
         assert path.read_text(encoding="utf-8") == content, (
             f"{path.relative_to(ROOT)} eski; `python desktop/scripts/kilavuz-esitle.py` çalıştırın"
         )
