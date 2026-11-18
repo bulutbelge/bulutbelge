@@ -86,10 +86,9 @@ jobs:
             patchelf libglib2.0-0 binutils fonts-dejavu-core
       - name: Motor bağımlılıkları (hash'li kilit)
         run: |
-          python -m pip install --no-cache-dir --require-hashes -r desktop/engine/requirements.lock
-          if [ -n "${{ matrix.ek_kilit }}" ]; then
-            python -m pip install --no-cache-dir --require-hashes -r "desktop/engine/${{ matrix.ek_kilit }}"
-          fi
+          # Ek kilit aynı pip çağrısında verilir: --require-hashes her bağımlılığın aynı anda sabit olmasını ister
+          ek=""; if [ -n "${{ matrix.ek_kilit }}" ]; then ek="-r desktop/engine/${{ matrix.ek_kilit }}"; fi
+          python -m pip install --no-cache-dir --require-hashes -r desktop/engine/requirements.lock $ek
           python -m pip install --no-cache-dir --no-deps --no-build-isolation ./core ./desktop/engine
           python -m pip check
       - name: OCR dil dosyaları (SHA-256 doğrulamalı)
