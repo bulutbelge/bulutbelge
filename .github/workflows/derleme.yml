@@ -8,6 +8,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      macos:
+        description: "macOS paketi de derlensin (GitHub macOS makinelerinde kuyruk uzun olabilir)"
+        type: boolean
+        default: false
 
 # Varsayılan salt okunur; yazma izni yalnızca Release adımında verilir.
 permissions:
@@ -45,6 +50,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Elle çalıştırmada macOS isteğe bağlı (ilk sürüm Windows, TAKIP 1.86); etikette her zaman derlenir.
+        # exclude yalnızca temel boyuta uygulanır; include satırları ad eşleşmesiyle özellik ekler.
+        ad: [windows, macos, linux]
+        exclude:
+          - ad: ${{ (github.event_name == 'workflow_dispatch' && !inputs.macos) && 'macos' || 'yok' }}
         include:
           - ad: windows
             calistirici: windows-latest
