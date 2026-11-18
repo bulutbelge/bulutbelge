@@ -18,4 +18,12 @@
   ; PATH'ten yalnızca kendi klasörümüzü çıkar.
   nsExec::ExecToLog `powershell.exe -NoProfile -NonInteractive -Command "$$d='$INSTDIR'; $$p=[Environment]::GetEnvironmentVariable('Path','User'); if ($$p) { [Environment]::SetEnvironmentVariable('Path', (($$p -split ';' | Where-Object { $$_ -and $$_ -ne $$d }) -join ';'), 'User') }"`
   Pop $0
+  ; Boş kalan kurulum klasörünü kaldır (doluysa RMDir dokunmaz) ve kayıt defteri anahtarını sil.
+  RMDir "$INSTDIR"
+  DeleteRegKey HKCU "Software\proteksistem\BulutBelge"
+  ; Uygulama verisi silinmediyse ayarların nerede kaldığını söyle (sessiz kaldırmada gösterme).
+  ${If} $DeleteAppDataCheckboxState = 0
+  ${AndIfNot} ${Silent}
+    MessageBox MB_OK|MB_ICONINFORMATION "Ayarlarınız ve işlem günlüğünüz $APPDATA\com.proteksistem.bulutbelge klasöründe kaldı. Gerekmiyorsa bu klasörü elle silebilirsiniz."
+  ${EndIf}
 !macroend

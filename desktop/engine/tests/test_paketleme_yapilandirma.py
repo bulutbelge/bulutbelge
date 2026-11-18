@@ -32,3 +32,15 @@ def test_kilitte_windows_bagimliliklari_hashli_ve_isaretli():
         ilk = girdi.splitlines()[0]
         assert '; sys_platform == "win32"' in ilk
         assert len(re.findall(r"--hash=sha256:[0-9a-f]{64}\b", girdi)) >= 2
+
+
+def test_wix_turkce_yerellestirme_dosyasi_var_ve_launchapp_tanimli():
+    """MSI bitiş sayfasındaki 'Launch' kutusu Türkçe olsun (TAKIP 1.110)."""
+    conf = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))
+    dil = conf["bundle"]["windows"]["wix"]["language"]
+    assert isinstance(dil, dict) and "en-US" in dil
+    yol = TAURI / dil["tr-TR"]["localePath"]
+    assert yol.is_file()
+    metin = yol.read_text(encoding="utf-8")
+    assert 'Culture="tr-TR"' in metin
+    assert re.search(r'<String Id="LaunchApp">[^<]+</String>', metin)

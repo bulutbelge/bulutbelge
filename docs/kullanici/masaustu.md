@@ -20,6 +20,7 @@ BulutBelge; PDF, Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), fotoğra
 10. [Örnek Test Belgeleriyle Deneme](#10-örnek-test-belgeleriyle-deneme)
 11. [Sık Karşılaşılan Sorunlar ve Çözümleri](#11-sık-karşılaşılan-sorunlar-ve-çözümleri)
 12. [Yönetim Paneli (panel.bulutbelge.com)](#12-yönetim-paneli-panelbulutbelgecom)
+13. [Uygulamayı Kaldırmak](#13-uygulamayı-kaldırmak)
 
 ---
 
@@ -64,6 +65,19 @@ engine/.venv/bin/python engine/tessdata_indir.py
   cd bulutbelge/desktop
   npm run tauri dev
   ```
+
+---
+
+### 1.4 Hazır Kurulum Paketi (Windows): Hangi Paket Kime?
+
+Hazır kurulum dosyasını kullanacaksanız (yukarıdaki geliştirici kurulumu gerekmez) iki paketten birini seçin:
+
+| Paket | Kime | Not |
+|---|---|---|
+| Normal (`...-setup.exe`, `....msi`) | İnternet erişimi olan bilgisayarlar | Küçüktür. WebView2 çalışma ortamı bilgisayarda yoksa kurulum sırasında Microsoft'tan indirilir. |
+| Çevrimdışı (`...-cevrimdisi` ekli dosyalar) | İnternet erişimi olmayan kurumlar | Yaklaşık 170 MB daha büyüktür. WebView2 paketin içindedir, indirme gerekmez. |
+
+**WebView2 notu:** Uygulama penceresi Microsoft WebView2 ile çalışır. Windows 10 ve 11'in güncel sürümlerinde zaten kuruludur; normal paket yalnızca eksikse indirir. İnternetsiz ve WebView2'si olmayan bir bilgisayarda normal paket kurulumu tamamlayamaz, çevrimdışı paketi kullanın.
 
 ---
 
@@ -236,3 +250,16 @@ Sol menüden sayfa seçilir; sağ üstteki **`Yenile`** verileri tazeler. Sol al
 **Sorunlar:** "Sunucudan veri alınamadı" uyarısı çıkarsa sunucu kapalıdır ya da ağa ulaşılamıyordur; sistem yöneticisine bildirin. Sol menüde **Sistem**'in yanında kırmızı sayı varsa ulaşılamayan bileşen vardır.
 
 Kurulum ve sunucu ayarları: `docs/sunucu/kurulum.md`. Tanıtım ve indirme sayfası: bulutbelge.com (`site/`).
+
+---
+
+## 13. Uygulamayı Kaldırmak
+
+Windows'ta uygulama iki paketle dağıtılır; kaldırma davranışı farklıdır.
+
+- **NSIS (`...-setup.exe`):** Kaldırıcıda **"Uygulama verilerini sil"** kutusu bulunur. İşaretlerseniz ayarlar, işlem günlüğü ve WebView2 önbelleği de silinir. İşaretlemezseniz veriler kalır ve kaldırıcı kalan yeri bildirir.
+- **MSI:** Veri silme seçeneği yoktur; program silinir, **uygulama verisi kalır**. Silmek isterseniz kaldırdıktan sonra şu klasörleri elle silin:
+  - `%APPDATA%\com.proteksistem.bulutbelge` (ayarlar ve işlem günlüğü)
+  - `%LOCALAPPDATA%\com.proteksistem.bulutbelge` (WebView2 önbelleği)
+
+**Not:** İşlem günlüğü bir denetim kaydıdır (hash zincirli). Silmeden önce kurumunuzun saklama kurallarına bakın; gerekiyorsa `CSV olarak dışa aktar` ile bir kopya alın. Günlüğü sildikten sonra geçmiş işlemler denetlenemez.

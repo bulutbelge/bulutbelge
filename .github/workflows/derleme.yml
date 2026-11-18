@@ -124,13 +124,30 @@ jobs:
       #     organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
       #     project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
       #     signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-      - name: Çıktıları topla ve özetle
+      - name: Çıktıları topla
         run: |
           mkdir -p cikti
           bundle=desktop/src-tauri/target/release/bundle
           for p in ${{ matrix.paketler }}; do
             find "$bundle/$p" -maxdepth 1 -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) -exec cp {} cikti/ \;
           done
+      # Çevrimdışı Windows paketi (TAKIP 1.111): WebView2 kurulum paketin içindedir (internetsiz kurumlar için).
+      # Normal paketler yukarıda cikti/ içine kopyalandı; burada aynı paketler yeniden derlenir ve "-cevrimdisi" ekiyle adlandırılır.
+      - name: Uygulamayı derle, çevrimdışı (Tauri, Windows)
+        if: matrix.ad == 'windows'
+        working-directory: desktop
+        run: npx tauri build --config src-tauri/tauri.release.conf.json --config src-tauri/tauri.offline.conf.json
+      - name: Çevrimdışı çıktıları topla (Windows)
+        if: matrix.ad == 'windows'
+        run: |
+          bundle=desktop/src-tauri/target/release/bundle
+          for p in ${{ matrix.paketler }}; do
+            for f in $(find "$bundle/$p" -maxdepth 1 -type f \( -name '*.msi' -o -name '*.exe' \)); do
+              ad=$(basename "$f"); cp "$f" "cikti/${ad%.*}-cevrimdisi.${ad##*.}"
+            done
+          done
+      - name: Çıktıları özetle
+        run: |
           ls -l cikti
           test -n "$(ls -A cikti)"
           (cd cikti && (sha256sum * 2>/dev/null || shasum -a 256 *) | tee ../ozet-${{ matrix.ad }}.txt)

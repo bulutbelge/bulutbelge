@@ -123,7 +123,7 @@ def handle_line(line: str) -> dict[str, Any]:
 
 def serve(stdin: TextIO, stdout: TextIO) -> None:
     for line in stdin:
-        line = line.strip()
+        line = line.lstrip("\ufeff").strip()
         if not line:
             continue
         stdout.write(json.dumps(handle_line(line), ensure_ascii=False) + "\n")

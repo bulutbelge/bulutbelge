@@ -107,3 +107,7 @@ Ayarlar uygulama veri klasöründe durur (Windows: `%APPDATA%\com.proteksistem.b
 
 - `settings.json`: profiller (kişisel veri içermez, düz metin).
 - `terms.bbvault`: özel ifadeler, parolayla şifreli (AES-256-GCM, scrypt). Parola ve anahtar diske yazılmaz; uygulama kapanınca kasa kilitlenir. Parola kurtarılamaz. Karar: `docs/kararlar/2026-11-04-ozel-ifade-sifreli-saklama.md`.
+
+## Kaldırma
+
+NSIS kaldırıcısında "Uygulama verilerini sil" kutusu vardır; MSI ile kaldırmada ayarlar ve işlem günlüğü (`%APPDATA%\com.proteksistem.bulutbelge`) ile WebView2 önbelleği (`%LOCALAPPDATA%\com.proteksistem.bulutbelge`) kalır, elle silinir. Ayrıntı: `docs/kullanici/masaustu.md` bölüm 13.

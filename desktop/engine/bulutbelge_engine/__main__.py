@@ -12,7 +12,8 @@ def main() -> None:
         cli_main()
         return
     # Windows'ta varsayılan kod sayfası yerine her iki yönde UTF-8 kullan.
-    sys.stdin.reconfigure(encoding="utf-8")
+    # utf-8-sig: PowerShell'in başa eklediği BOM'u kabul eder.
+    sys.stdin.reconfigure(encoding="utf-8-sig")
     sys.stdout.reconfigure(encoding="utf-8", newline="\n")
     serve(sys.stdin, sys.stdout)
 

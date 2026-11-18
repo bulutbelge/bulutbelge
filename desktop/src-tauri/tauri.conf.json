@@ -35,8 +35,18 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "webviewInstallMode": { "type": "offlineInstaller" },
-      "nsis": { "installerHooks": "windows/hooks.nsh" }
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "nsis": {
+        "installerHooks": "windows/hooks.nsh",
+        "languages": ["Turkish", "English"],
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": {
+          "tr-TR": { "localePath": "windows/wix/tr-TR.wxl" },
+          "en-US": {}
+        }
+      }
     }
   }
 }

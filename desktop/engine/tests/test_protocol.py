@@ -25,6 +25,12 @@ def test_serve_skips_blank_lines_and_answers_each_request():
     lines = [json.loads(l) for l in stdout.getvalue().splitlines()]
     assert [l["id"] for l in lines] == [1, 2]
 
+def test_serve_accepts_utf8_bom_on_first_line():
+    stdin = io.StringIO('\ufeff{"id": 1, "method": "ping"}\n')
+    stdout = io.StringIO()
+    serve(stdin, stdout)
+    assert json.loads(stdout.getvalue())["result"] == "pong"
+
 def test_rules_types_lists_builtin_types():
     resp = handle_line('{"id": 4, "method": "rules.types"}')
     keys = [t["key"] for t in resp["result"]]

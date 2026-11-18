@@ -1,5 +1,7 @@
 """Uygulamayı denemek için sahte verili örnek belgeler üretir.
 
+Ön koşul (bir kez, repo kökünden): pip install "./core[dev]"
+
 Kullanım (desktop/engine/.venv içindeki Python ile, repo kökünden):
 
     python core/tools/ornek_veri_uret.py <hedef-klasör>
