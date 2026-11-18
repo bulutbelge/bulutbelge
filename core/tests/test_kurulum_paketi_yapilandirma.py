@@ -6,7 +6,10 @@ import yaml
 
 KOK = Path(__file__).resolve().parents[2]
 TAURI = KOK / "desktop" / "src-tauri"
-DERLEME = KOK / "core" / "tools" / "acik_kaynak" / "github" / "workflows" / "derleme.yml"
+# Bitbucket deposunda kaynak yerinde, açık depoda .github/ altında (TAKIP 1.106)
+DERLEME = next((p for p in (KOK / "core" / "tools" / "acik_kaynak" / "github" / "workflows" / "derleme.yml",
+                             KOK / ".github" / "workflows" / "derleme.yml") if p.is_file()),
+               KOK / ".github" / "workflows" / "derleme.yml")
 
 
 def _json(ad):
