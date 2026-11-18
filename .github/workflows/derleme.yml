@@ -1,0 +1,158 @@
+# Açık depo sürüm derlemesi (TAKIP 1.106). Bitbucket'taki bitbucket-pipelines.yml derleme adımları (1.87) örnek alındı.
+# v* etiketinde ve elle çalışır: önce testler, sonra Windows (MSI, NSIS), macOS (dmg), Linux (deb, AppImage),
+# en sonda SHA256SUMS ve taslak Release. İmzasız derlemedir; imza adımı için aşağıdaki SignPath yer tutucusuna bakın.
+# Eylemler commit SHA'sı ile sabitlenir; sürüm yorumu yanındadır. Güncellerken SHA'yı etiketten yeniden çözün.
+name: Derleme
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Varsayılan salt okunur; yazma izni yalnızca Release adımında verilir.
+permissions:
+  contents: read
+
+concurrency:
+  group: derleme-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONHASHSEED: "0"
+
+jobs:
+  test:
+    name: Testler (çekirdek ve motor)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libglib2.0-0 fonts-dejavu-core
+      - run: pip install "./core[dev]" "./desktop/engine[dev]"
+      - run: python -m pytest -q
+        working-directory: core
+      - run: python -m pytest -q
+        working-directory: desktop/engine
+
+  derle:
+    name: Derleme (${{ matrix.ad }})
+    needs: test
+    runs-on: ${{ matrix.calistirici }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ad: windows
+            calistirici: windows-latest
+            hedef: x86_64-pc-windows-msvc
+            ek_kilit: requirements-windows.lock
+            paketler: "msi nsis"
+          - ad: macos
+            calistirici: macos-latest
+            hedef: aarch64-apple-darwin
+            ek_kilit: requirements-macos.lock
+            paketler: "dmg"
+          - ad: linux
+            calistirici: ubuntu-22.04
+            hedef: x86_64-unknown-linux-gnu
+            ek_kilit: ""
+            paketler: "deb appimage"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: SOURCE_DATE_EPOCH (commit zamanı)
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+      - name: Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Linux sistem paketleri
+        if: matrix.ad == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf libglib2.0-0 binutils fonts-dejavu-core
+      - name: Motor bağımlılıkları (hash'li kilit)
+        run: |
+          python -m pip install --no-cache-dir --require-hashes -r desktop/engine/requirements.lock
+          if [ -n "${{ matrix.ek_kilit }}" ]; then
+            python -m pip install --no-cache-dir --require-hashes -r "desktop/engine/${{ matrix.ek_kilit }}"
+          fi
+          python -m pip install --no-cache-dir --no-deps --no-build-isolation ./core ./desktop/engine
+          python -m pip check
+      - name: OCR dil dosyaları (SHA-256 doğrulamalı)
+        run: python desktop/engine/tessdata_indir.py
+      - name: Motoru paketle (PyInstaller)
+        working-directory: desktop/engine
+        env:
+          BULUTBELGE_TARGET: ${{ matrix.hedef }}
+        run: python build.py
+      - name: Arayüz bağımlılıkları
+        working-directory: desktop
+        run: npm ci
+      - name: Uygulamayı derle (Tauri)
+        working-directory: desktop
+        run: npx tauri build --config src-tauri/tauri.release.conf.json
+      # İMZA (yer tutucu, TAKIP 1.85/1.106): SignPath onayı gelince açılır. Gizli değişken adları yalnızca burada
+      # anılır; değerleri açık depoda asla yer almaz, GitHub › Settings › Secrets and variables altında tutulur.
+      # - name: SignPath ile imzala (Windows)
+      #   if: matrix.ad == 'windows'
+      #   uses: signpath/github-action-submit-signing-request@<COMMIT-SHA>  # onay sonrası sabitlenecek
+      #   with:
+      #     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+      #     organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+      #     project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+      #     signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+      - name: Çıktıları topla ve özetle
+        run: |
+          mkdir -p cikti
+          bundle=desktop/src-tauri/target/release/bundle
+          for p in ${{ matrix.paketler }}; do
+            find "$bundle/$p" -maxdepth 1 -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) -exec cp {} cikti/ \;
+          done
+          ls -l cikti
+          test -n "$(ls -A cikti)"
+          (cd cikti && (sha256sum * 2>/dev/null || shasum -a 256 *) | tee ../ozet-${{ matrix.ad }}.txt)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kurulum-${{ matrix.ad }}
+          path: cikti/*
+          if-no-files-found: error
+
+  yayin:
+    name: SHA256SUMS ve taslak Release
+    needs: derle
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: cikti
+          pattern: kurulum-*
+          merge-multiple: true
+      - name: SHA256SUMS
+        working-directory: cikti
+        run: |
+          find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\n' | LC_ALL=C sort | xargs sha256sum | tee SHA256SUMS
+      # Taslak Release: yayımlamak insan onayıyla, GitHub arayüzünden yapılır.
+      - name: Taslak Release oluştur
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ETIKET: ${{ github.ref_name }}
+        run: |
+          gh release create "$ETIKET" cikti/* --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "BulutBelge $ETIKET" --notes "Taslak. İmzasız derleme; SHA256SUMS ile doğrulayın."

@@ -1,0 +1,30 @@
+[project]
+name = "bulutbelge-engine"
+version = "0.1.0"
+description = "BulutBelge masaüstü uygulamasının Python motoru (Tauri yan süreci)"
+requires-python = ">=3.12"
+# Geliştirmede: pip install -e ../../core
+dependencies = ["bulutbelge-core", "cryptography>=42"]
+
+[project.scripts]
+# Ajan komutu (TAKIP 1.37): docs/AJAN-KOMUT-SATIRI.md
+bulutbelge = "bulutbelge_engine.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "pyinstaller"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# `tessdata/` (OCR dil dosyaları), `tests/` ve `build/` paket sayılmasın; yoksa setuptools
+# "birden çok üst düzey paket" hatasıyla kurulumu reddeder (tessdata indirildikten sonra).
+include = ["bulutbelge_engine*"]
+
+[tool.setuptools.package-data]
+bulutbelge_engine = ["kilavuz.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
