@@ -8,6 +8,8 @@ import { Icon } from "./ui";
  * burada özeti gösterilir. İlk açılışta bir kez kabul istenir, Ayarlar'da her zaman okunabilir.
  */
 const KOSUL_ADRESI = "https://bulutbelge.com/kosullar.html";
+/** Kullanım kılavuzu (TAKIP D.6): React ürün belgesindeki masaüstü sayfası (dokuman/apps/urun-dokuman). Tarayıcıda açılır; uygulama veri göndermez. */
+const KILAVUZ_ADRESI = "https://bulutbelge.com/belgeler/#/masaustu-kurulum";
 /** Koşullar değişirse bu sürüm yükseltilir ve kabul yeniden istenir. */
 const KOSUL_SURUMU = "2026-11-10";
 const KABUL_ANAHTARI = "bb.kosulKabul";
@@ -52,6 +54,12 @@ export function HakkindaBolumu() {
       <KosulMaddeleri />
       <p className="hint">
         <KosulBaglantisi /> · {t("Koşulların sürümü")}: {KOSUL_SURUMU}
+      </p>
+      <p className="hint">
+        <button type="button" className="link-btn" onClick={() => void openUrl(KILAVUZ_ADRESI).catch(() => undefined)}>
+          {t("Kullanım kılavuzu")}
+        </button>{" "}
+        · {t("tarayıcıda açılır")}
       </p>
     </div>
   );

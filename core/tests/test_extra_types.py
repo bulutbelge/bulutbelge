@@ -289,3 +289,19 @@ def test_pdf_iban_wrap_with_trailing_space_and_hyphen():
     for sep in (" \n", "-\n", "\n\n"):
         text = f"IBAN: {raw[:14]}{sep}{raw[14:]} son"
         assert any(k == "iban" for k, *_ in find_mixed(text)), repr(sep)
+def test_secrets_detected_with_low_false_positives():
+    api = "sk-" + "ornek" * 5
+    gh = "ghp_" + "A" * 24
+    aws = "AKIA" + "0" * 16
+    bb = "bb_" + "ornek_" + "0" * 16
+    jwt = "eyJ" + "aGVsbG8" + "." + "eyJ" + "zdWIiOiIx" + "." + "imza12345678"
+    db = "postgres://appuser:" + "sahteParola99" + "@db.local:5432/demo"
+    pem = "-----BEGIN " + "PRIVATE KEY-----\nMIIBVQIBADANBgkqhkiG9w0=\n-----END PRIVATE KEY-----"
+
+    text = "\n".join([api, gh, aws, bb, jwt, db, pem, "Sürüm: 1.2.3", "https://example.com/dokuman"])
+    detected = found(text, Rules.default())
+    for secret in (api, gh, aws, bb, jwt, db, pem):
+        assert ("gizli_anahtar", secret) in detected
+    assert not any(v in ("1.2.3", "https://example.com/dokuman") for _, v in detected)
+    assert rep(f"Anahtar: {bb}", "gizli_anahtar", Rules.from_dict({"types": {"gizli_anahtar": {"enabled": True, "method": "etiket"}}})) == "[GIZLI ANAHTAR]"
+

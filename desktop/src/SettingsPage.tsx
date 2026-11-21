@@ -53,6 +53,7 @@ export function SettingsPage({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [kaydedildi, setKaydedildi] = useState(false);
   const [vaultMode, setVaultMode] = useState<"idle" | "change" | "forgot">("idle");
   const t = useT();
   const [lang, setLang] = useLang();
@@ -105,6 +106,8 @@ export function SettingsPage({
       setProfiles(s.profiles);
       onSaved({ ...s, vault }, savedTerms);
       setFlash(t("Kaydedildi"));
+      setKaydedildi(true);
+      setTimeout(() => setKaydedildi(false), 1800);
       setTimeout(() => setFlash(null), 2000);
     } catch (e) {
       setError(String(e));
@@ -229,7 +232,7 @@ export function SettingsPage({
             {t("Açılışta yeni sürümü denetle")}
           </label>
           <p className="hint">
-            {t("İnternet varsa bulutbelge.com'daki sürüm bilgisine bakılır. Belge, kural ya da kişisel veri gönderilmez.")}
+            {t("Varsayılan olarak kapalıdır. Açarsanız, internet varsa bulutbelge.com'daki sürüm bilgisine bakılır. Belge, kural ya da kişisel veri gönderilmez.")}
           </p>
         </div>
 
@@ -467,17 +470,6 @@ export function SettingsPage({
                 <p className="hint">
                   {t("Kapalıyken aynı kişi tüm belgelerde aynı takma adı alır; bu, belgelerin birbiriyle eşleştirilmesini kolaylaştırır. Takma ad anonimleştirme değildir.")}
                 </p>
-                <label className="check-row">
-                  <input
-                    type="checkbox"
-                    checked={profile.fixed_box === true}
-                    onChange={(e) => update({ fixed_box: e.target.checked ? true : undefined })}
-                  />
-                  {t("Karartma kutusu sabit genişlikte olsun")}
-                </label>
-                <p className="hint">
-                  {t("PDF ve görselde kutunun genişliği maskelenen değerin uzunluğunu ele vermez; kutunun altındaki komşu metin de silinir.")}
-                </p>
                 <AllowPanel />
               </section>
             </div>
@@ -517,14 +509,14 @@ export function SettingsPage({
         </div>
 
         <footer className="actionbar">
-          <span className="status">
+          <span className="status" key={flash ?? (dirty ? "k" : "t")}>
             {flash ?? (dirty ? t("Kaydedilmemiş değişiklikler var.") : t("Tüm değişiklikler kaydedildi."))}
           </span>
           <button type="button" className="btn" onClick={revert} disabled={!dirty || busy}>
             {t("Geri al")}
           </button>
-          <button type="button" className="btn primary" onClick={save} disabled={!dirty || busy}>
-            <Icon name="check" /> {busy ? t("Kaydediliyor…") : t("Kaydet")}
+          <button type="button" className={"btn primary" + (busy ? " is-busy" : "") + (kaydedildi && !dirty ? " kaydedildi" : "")} onClick={save} disabled={!dirty || busy}>
+            <Icon name="check" /> {busy ? t("Kaydediliyor…") : kaydedildi && !dirty ? t("Kaydedildi") : t("Kaydet")}
           </button>
         </footer>
       </div>

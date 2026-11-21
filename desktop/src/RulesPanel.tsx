@@ -11,7 +11,7 @@ export const TYPE_GROUPS: { key: string; label: string; hint: string; icon: Icon
     label: "Kişisel bilgiler",
     hint: "Kişiyi doğrudan ya da dolaylı tanıtan bilgiler",
     icon: "user",
-    types: ["kisi_adi", "tc_kimlik", "dogum_tarihi", "pasaport", "ehliyet"],
+    types: ["kisi_adi", "tc_kimlik", "dogum_tarihi", "pasaport", "ehliyet", "mrz"],
   },
   {
     key: "iletisim",
@@ -39,14 +39,14 @@ export const TYPE_GROUPS: { key: string; label: string; hint: string; icon: Icon
     label: "İmza, kaşe ve görseller",
     hint: "Belgedeki imza, kaşe, fotoğraftaki yüzler ve elle seçilen alanlar",
     icon: "pen",
-    types: ["imza", "yuz", "elle"],
+    types: ["imza", "yuz", "barkod_qr", "elle"],
   },
   {
     key: "teknik",
     label: "Araç ve teknik bilgiler",
     hint: "Plaka, IP adresi, IMEI, MAC adresi, şase no, GPS konumu, kullanıcı adı, unvan + kurum",
     icon: "monitor",
-    types: ["plaka", "ip", "imei", "mac", "sase_no", "gps", "kullanici_adi", "unvan_kurum"],
+    types: ["plaka", "ip", "imei", "mac", "sase_no", "gps", "kullanici_adi", "unvan_kurum", "gizli_anahtar"],
   },
 ];
 

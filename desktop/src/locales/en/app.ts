@@ -22,9 +22,9 @@ export default {
   "Değiştir": "Change",
   // Ana sayfa
   "Belgeleri buraya bırakın": "Drop documents here",
-  "İsim, TC kimlik, telefon, adres gibi kişisel bilgileri bulup gizliyoruz. Ne maskeleneceğini sonra siz seçersiniz.": "We find personal data such as names, national ID numbers, phone numbers and addresses and mask it. You choose what gets masked afterwards.",
+  "İsim, TC kimlik, telefon, adres gibi kişisel bilgileri bulup maskeliyoruz. Ne maskeleneceğini sonra siz seçersiniz.": "We find personal data such as names, national ID numbers, phone numbers and addresses and mask it. You choose what gets masked afterwards.",
   "Bilgisayardan seç": "Choose from computer",
-  "PDF · Word · Excel · PowerPoint · fotoğraf · XML, TXT, CSV, ZIP · birden çok dosya olabilir": "PDF · Word · Excel · PowerPoint · photo · XML, TXT, CSV, ZIP · multiple files allowed",
+  "PDF · Word · Excel · PowerPoint · fotoğraf · XML, CSV, JSON, TXT, LOG, ZIP · birden çok dosya olabilir": "PDF · Word · Excel · PowerPoint · photo · XML, CSV, JSON, TXT, LOG, ZIP · multiple files allowed",
   "Bir klasördeki bütün belgeler mi?": "A whole folder of documents?",
   "Klasör seçin": "Choose a folder",
   "Son yapılanlar": "Recent",
@@ -105,7 +105,7 @@ export default {
   "Parola en az {n} karakter olmalı.": "The password must be at least {n} characters.",
   "Parolayı alıcıya ayrı bir yoldan (telefon, mesaj) iletin. Uygulama parolayı saklamaz.": "Send the password to the recipient through a separate channel (phone, message). The app does not store the password.",
   // Açık kalanlar
-  "Bulunan kişisel bilgilerin hepsi kopyada gizli.": "All personal data found is masked in the copy.",
+  "Bulunan kişisel bilgilerin hepsi kopyada maskelendi.": "All personal data found is masked in the copy.",
   "{label} (emin olunamayan)": "{label} (uncertain)",
   "Kopyada açık kalanlar": "Left visible in the copy",
   "Bunları bilerek açık bıraktınız. Değiştirmek için “Seçimleri değiştirip yeniden kaydet”.": "You left these visible on purpose. To change this, use “Change selections and save again”.",

@@ -11,6 +11,8 @@ def _data_dir(tmp_path_factory, monkeypatch):
 
     veri = tmp_path_factory.mktemp("veri")
     monkeypatch.setenv("BULUTBELGE_DATA_DIR", str(veri))
+    # Testler geliştirme modunda: ajan komutu ayar klasörünü --veri-klasoru ile kabul eder.
+    monkeypatch.setenv("BULUTBELGE_GELISTIRME", "1")
     settings.VAULT.lock()
     yield
     settings.VAULT.lock()

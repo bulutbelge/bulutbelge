@@ -228,7 +228,7 @@ export function PseudonymPanel() {
     <div className="pseudo">
       <div className="pseudo-counts">
         {counts === null ? (
-          <span className="hint">{t("Yükleniyor…")}</span>
+          <span className="iskelet-grup" role="status" aria-label={t("Yükleniyor…")}><i className="iskelet" /><i className="iskelet" /><i className="iskelet" /></span>
         ) : total === 0 ? (
           <span className="hint">{t("Henüz takma ad yok. Ayarlar'da bir türün yöntemini “Takma ad” yapıp maskeleyin.")}</span>
         ) : (

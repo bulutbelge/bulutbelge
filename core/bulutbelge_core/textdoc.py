@@ -1,4 +1,4 @@
-"""Metin tabanlı belgeler: XML (e-Fatura, e-Arşiv, UBL), TXT ve CSV.
+"""Metin tabanlı belgeler: XML (e-Fatura, e-Arşiv, UBL), CSV ve düz metin türleri (TXT, LOG, MD, JSON, TSV, INI, YAML).
 
 Dosya olduğu gibi okunur ve yalnızca içerik bölümleri taranır; biçim, girinti
 ve satır sonları korunur. XML'de içerik bölümü; etiketler arasındaki metin,
@@ -29,14 +29,17 @@ from .loose import find_split_cells
 from .names import name_hints
 from .pdf import PdfError, _normalize, count_types, unique_path
 from .rules import BLACKOUT, BLUR, Rules
+from .xmltok import iter_tokens
 
-TEXT_EXTS = {".xml", ".txt", ".csv"}
+# xml ve csv kendi kurallarıyla; geri kalanı düz metin gibi taranır ve maskelenir (biçim işareti taşımayan türler).
+TEXT_EXTS = {".xml", ".txt", ".csv", ".log", ".md", ".json", ".tsv", ".ini", ".yaml", ".yml"}
 MAX_BYTES = 20 * 1024 * 1024
 
 _BLACKOUT_TEXT = "█████"
 _BLACKOUT_FALLBACK = "*****"  # █ yazılamayan kodlamalarda (ör. Windows-1254)
 
-# Etiket: öznitelik değerleri ">" içerebileceği için tırnaklar ayrıca ele alınır.
+# Etiket: öznitelik değerleri ">" içerebileceği için tırnaklar ayrıca ele alınır. Yorum, CDATA ve işleme
+# talimatı `xmltok.iter_tokens` ile doğrusal taranır (kapanmayan açıcı ikinci dereceden sürüyordu, F9/F20).
 _TOKEN = re.compile(
     r"<!--(?P<comment>.*?)-->"
     r"|<!\[CDATA\[(?P<cdata>.*?)\]\]>"
@@ -48,8 +51,9 @@ _ATTR_VALUE = re.compile(r"=\s*(?:\"(?P<dq>[^\"]*)\"|'(?P<sq>[^']*)')")
 _DOCTYPE = re.compile(r"<!DOCTYPE", re.IGNORECASE)
 _XML_ENCODING = re.compile(rb"^\s*<\?xml[^>]*encoding\s*=\s*[\"']([A-Za-z0-9._-]+)[\"']")
 _CHAR_REF = re.compile(r"&#[0-9xX]")
-# Gömülü dosya: uzun, yalnızca base64 karakterlerinden oluşan metin.
-_BASE64 = re.compile(r"\s*[A-Za-z0-9+/=\s]{1000,}\s*")
+# Gömülü dosya: uzun, yalnızca base64 karakterlerinden oluşan metin. Sınıf boşluğu da içerdiği için baştaki
+# ve sondaki `\s*` gereksizdi ve tam eşleşme başarısız olunca kübik geri izliyordu (F19); dil aynı.
+_BASE64 = re.compile(r"[A-Za-z0-9+/=\s]{1000,}")
 
 
 @dataclass
@@ -108,7 +112,7 @@ def _content_spans(text: str, fmt: str) -> list[tuple[int, int]]:
         return [(0, len(text))]
     spans: list[tuple[int, int]] = []
     pos = 0
-    for m in _TOKEN.finditer(text):
+    for m in iter_tokens(_TOKEN, text):
         if m.start() > pos:
             spans.append((pos, m.start()))  # etiketler arasındaki metin
         if m.group("comment") is not None:

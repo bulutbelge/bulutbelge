@@ -6,7 +6,8 @@ import { Icon } from "./ui";
 
 /**
  * Açılışta yeni sürüm denetimi. Ayrıntı ve gizlilik notu: `src-tauri/src/guncelleme.rs`.
- * Yalnızca haber verir; indirmeyi kullanıcı yapar. Ayarlar'dan kapatılabilir.
+ * Yalnızca haber verir; indirmeyi kullanıcı yapar. Varsayılan KAPALIDIR (21 Kasım 2026 kararı: uygulama
+ * kullanıcı istemedikçe ağa çıkmaz); Ayarlar'dan açılır.
  */
 export interface YeniSurum {
   surum: string;
@@ -33,7 +34,7 @@ function yaz(key: string, value: string) {
 }
 
 export function denetimAcik(): boolean {
-  return oku(KEY_ACIK) !== "kapali";
+  return oku(KEY_ACIK) === "acik";
 }
 
 export function denetimiAyarla(acik: boolean) {

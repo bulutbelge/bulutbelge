@@ -2535,16 +2535,12 @@ mark.hl {
   margin: 0 auto;
 }
 
-/* Kütüphanenin gri çerçevesi yerine uygulamanın önizleme zemini */
-.word-doc .docx-wrapper {
-  padding: 0;
-  gap: 16px;
-  background: transparent;
-}
-
-.word-doc .docx-wrapper > section.docx {
-  margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 18%), 0 6px 20px rgb(0 0 0 / 10%);
+/* Belge kapalı shadow root içinde çizilir (WordPreview.tsx). Belge CSS'iyle sabit konumlanan ya da yüksek
+   katmanlı öğeler bu kabın içinde kalır: önizleme alanının dışına, uygulamanın üstüne çıkamaz. Kütüphanenin
+   gri çerçevesi yerine uygulama zemini kuralları shadow root'tadır (baseSheet). */
+.word-doc-frame {
+  contain: layout;
+  isolation: isolate;
 }
 
 .word-boxes {
@@ -5936,7 +5932,37 @@ mark.hl {
   flex-direction: column;
   gap: 12px;
   height: 100%;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+}
+
+/* Kopyanın yolu kesilmesin: satıra sığmazsa alta kırılır, tamamı okunur ve seçilip kopyalanabilir */
+.studio-right-done .path-line {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-all;
+  font-size: 12px;
+  user-select: text;
+}
+
+.studio-right-done > * {
+  min-width: 0;
+}
+
+/* Uzun içerikte kaydırılırken düğmeler her zaman erişilebilir kalsın */
+.studio-right-done .side-actions {
+  position: sticky;
+  bottom: -14px;
+  margin: 0 -12px -14px;
+  padding: 10px 12px 14px;
+  background: var(--surface);
+}
+
+.studio-right-done .link-btn {
+  white-space: normal;
+  text-align: center;
 }
 
 .studio-done-head {
@@ -8594,4 +8620,338 @@ mark.hl {
     padding: 0 9px;
     font-size: 12.5px;
   }
+}
+
+/* ---------- Hareket (sade): tarama animasyonu, Uygula düğmesi, geçişler ---------- */
+
+/* Tarama: küçük bir belge, üzerinde süzülen ışık çizgisi ve sırayla beliren satırlar */
+.tara-belge {
+  position: relative;
+  width: 64px;
+  height: 80px;
+  margin-bottom: 8px;
+  padding: 14px 10px;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px -10px var(--accent);
+  overflow: hidden;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.tara-belge i {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent-soft);
+  animation: tara-satir 1.8s ease-in-out infinite;
+}
+
+.tara-belge i:nth-child(1) { width: 70%; animation-delay: 0s; }
+.tara-belge i:nth-child(2) { width: 100%; animation-delay: 0.15s; }
+.tara-belge i:nth-child(3) { width: 85%; animation-delay: 0.3s; }
+.tara-belge i:nth-child(4) { width: 55%; animation-delay: 0.45s; }
+
+.tara-belge::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22px;
+  background: linear-gradient(to bottom, transparent, var(--accent-soft) 60%, var(--accent));
+  opacity: 0.55;
+  border-bottom: 2px solid var(--accent);
+  animation: tara-cizgi 1.8s ease-in-out infinite;
+}
+
+@keyframes tara-cizgi {
+  0% { transform: translateY(-24px); }
+  100% { transform: translateY(82px); }
+}
+
+@keyframes tara-satir {
+  0%, 100% { background: var(--accent-soft); }
+  50% { background: var(--accent); }
+}
+
+.loading-card {
+  animation: yumusak-gir 0.22s ease-out both;
+}
+
+@keyframes yumusak-gir {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Uygula düğmesi: çalışırken ışık süzülür, basınca hafifçe iner */
+.studio-apply-btn {
+  position: relative;
+  overflow: hidden;
+  transition: background 0.12s, border-color 0.12s, transform 0.1s;
+}
+
+.studio-apply-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.studio-apply-btn.is-busy {
+  cursor: progress;
+}
+
+.studio-apply-btn.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: dugme-isik 1.4s ease-in-out infinite;
+}
+
+@keyframes dugme-isik {
+  to { transform: translateX(100%); }
+}
+
+/* Sonuçlar belirince ve sağ panel değişince yumuşak giriş */
+.studio-doc-stage,
+.studio-inspector-placeholder {
+  animation: yumusak-gir 0.22s ease-out both;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tara-belge::after,
+  .tara-belge i,
+  .loading-card,
+  .studio-apply-btn.is-busy::after,
+  .studio-doc-stage,
+  .studio-inspector-placeholder {
+    animation: none;
+  }
+  .tara-belge::after {
+    display: none;
+  }
+}
+
+/* ---------- Hareket, ikinci tur: düğmeler, onay işareti, iskelet, sürükle-bırak ---------- */
+
+/* Kaydet / Maskele / Ayarlar Kaydet: çalışırken ışık süzülür (Uygula düğmesiyle aynı dil) */
+.btn.is-busy {
+  position: relative;
+  overflow: hidden;
+  cursor: progress;
+}
+
+.btn.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: dugme-isik 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Toplu işlemde düğmenin alt kenarında ilerleme çubuğu (--ilerleme: yüzde) */
+.studio-save-btn.is-busy {
+  position: relative;
+}
+
+.studio-save-btn.is-busy::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: var(--ilerleme, 0%);
+  background: rgba(255, 255, 255, 0.85);
+  transition: width 0.35s ease;
+}
+
+/* Tamamlandı: onay işareti bir kez, hafifçe büyüyerek yerine oturur */
+.queue-item.done .queue-num svg,
+.studio-doc-item.done .studio-doc-idx svg {
+  animation: onay-pop 0.28s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+
+@keyframes onay-pop {
+  0% { transform: scale(0.3); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.queue-num,
+.studio-doc-idx {
+  transition: background 0.25s, color 0.25s;
+}
+
+/* Toplu işlemde sıradaki belge satırı: kenarında yavaş bir nabız */
+.studio-doc-item.active.calisiyor {
+  animation: satir-nabiz 1.6s ease-in-out infinite;
+}
+
+@keyframes satir-nabiz {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 3px var(--accent-soft); }
+}
+
+/* Ayarlar alt çubuğu: durum yazısı değişince yumuşakça belirir */
+.status {
+  animation: yumusak-gir 0.2s ease-out both;
+}
+
+/* Kasa ve benzeri liste yüklemeleri: iskelet satırlar */
+.iskelet-grup {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.iskelet {
+  display: inline-block;
+  width: 84px;
+  height: 22px;
+  border-radius: 11px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--accent-soft) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: iskelet-akis 1.4s ease-in-out infinite;
+}
+
+.iskelet:nth-child(2) { width: 110px; animation-delay: 0.12s; }
+.iskelet:nth-child(3) { width: 64px; animation-delay: 0.24s; }
+
+@keyframes iskelet-akis {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* Sürükle-bırak: ekran örtüsü yumuşakça gelir, kesikli çerçeve hafifçe nabız atar */
+.drop-overlay {
+  animation: yumusak-gir 0.15s ease-out both;
+}
+
+.drop-overlay > div {
+  animation: cerceve-nabiz 1.2s ease-in-out infinite;
+}
+
+@keyframes cerceve-nabiz {
+  0%, 100% { border-color: var(--accent); background: transparent; }
+  50% { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: rgb(31 95 209 / 5%); }
+}
+
+.drop-zone .drop-icon {
+  transition: transform 0.18s ease;
+}
+
+.drop-zone:hover .drop-icon {
+  transform: translateY(-3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-busy::after,
+  .studio-doc-item.active.calisiyor,
+  .iskelet,
+  .drop-overlay,
+  .drop-overlay > div,
+  .status,
+  .queue-item.done .queue-num svg,
+  .studio-doc-item.done .studio-doc-idx svg {
+    animation: none;
+  }
+  .drop-zone:hover .drop-icon {
+    transform: none;
+  }
+}
+
+/* Kaydedildi: düğme kısa süre yeşile döner, onay işareti yerine oturur */
+.btn.kaydedildi {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #fff;
+  opacity: 1;
+  transition: background 0.25s, border-color 0.25s;
+}
+
+.btn.kaydedildi svg {
+  animation: onay-pop 0.28s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.kaydedildi svg {
+    animation: none;
+  }
+}
+
+/* Toplu taramada kart içi ilerleme şeridi */
+.ilerleme-serit {
+  display: block;
+  width: 220px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.ilerleme-serit i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.35s ease;
+}
+
+.studio-apply-btn.is-busy::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: var(--ilerleme, 0%);
+  background: var(--accent);
+  transition: width 0.35s ease;
+}
+
+/* Maskeleme: satırlar sırayla kararır (karartma), tarama çizgisi yok */
+.tara-belge.maske::after {
+  display: none;
+}
+
+.tara-belge.maske i {
+  animation: maske-satir 1.6s ease-in-out infinite;
+}
+
+@keyframes maske-satir {
+  0%, 25% { background: var(--accent-soft); }
+  55%, 100% { background: var(--text); }
+}
+
+/* Çalışan düğme soluk (devre dışı) görünmesin: ışık ve ilerleme net seçilsin */
+.btn.is-busy:disabled {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tara-belge.maske i {
+    animation: none;
+  }
+}
+
+/* Maskeleme/kaydetme sırasında belge görünümü sökülmez; üstüne yarı saydam örtü ve kart gelir */
+.maske-ortu {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg, #fff) 70%, transparent);
+  backdrop-filter: blur(2px);
+  animation: yumusak-gir 0.15s ease-out both;
+}
+
+/* Mavi (birincil) düğmede ilerleme çizgisi beyaz görünsün */
+.studio-apply-btn.primary.is-busy::before {
+  background: rgba(255, 255, 255, 0.85);
 }

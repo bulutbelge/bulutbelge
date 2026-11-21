@@ -105,7 +105,7 @@ export interface PdfFinding {
   unit?: string;
 }
 
-/** "pdf" | "gorsel" (fotoğraf, taranmış görsel) | "metin" (XML, TXT, CSV) | "word" (DOCX) */
+/** "pdf" | "gorsel" (fotoğraf, taranmış görsel) | "metin" (XML, CSV, JSON, TXT, LOG) | "word" (DOCX) */
 export type DocFormat = "pdf" | "gorsel" | "metin" | "word" | "sunum" | "tablo" | "arsiv";
 
 export interface FormatsInfo {

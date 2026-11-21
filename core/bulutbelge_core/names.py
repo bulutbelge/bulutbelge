@@ -171,11 +171,13 @@ _WORD = r"[A-ZÇĞİÖŞÜ][a-zçğıöşü]+|[A-ZÇĞİÖŞÜ]{2,}"
 _STRONG = re.compile(
     r"(?i)(?:ad[ıi]?\s*(?:ve\s*)?soyad[ıi]?|ad\s*-\s*soyad|isim(?:\s*soyisim)?|sayın|sn\.|name|full\s+name)"
 )
+# Etiketten sonraki ayırıcı `\s*(?:[:\-][ \t]*)?`: eski `\s*[:\-]?[ \t]*` ile aynı dil, ama boşluk dizisi
+# iki niceleyiciye bölünebildiği için ad gelmeyince ikinci dereceden geri izliyordu (güvenlik taraması F6/F22).
 _LABEL = re.compile(
     r"(?i)(?<!\w)(ad[ıi]?\s*(?:ve\s*)?soyad[ıi]?|ad\s*-\s*soyad|isim(?:\s*soyisim)?|sayın|sn\.|"
     r"kiracı|kiraya\s+veren|işçi|çalışan|personel|müşteri|hasta|öğrenci|veli|vekil|katılımcı|başvuran|"
     r"hazırlayan|düzenleyen|teslim\s+alan|teslim\s+eden|yetkili|alıcı|gönderen|sigortalı|borçlu|kefil|"
-    r"tanık|davacı|davalı|name|full\s+name)\s*[:\-]?[ \t]*"
+    r"tanık|davacı|davalı|name|full\s+name)\s*(?:[:\-][ \t]*)?"
     r"(?-i:((?:" + _WORD + r")(?:[ \t]+(?:" + _WORD + r")){1,3}))"
 )
 _TOKEN = re.compile(r"[^\W\d_]+")
@@ -274,7 +276,7 @@ def find_person_names(text: str) -> Iterator[tuple[int, int, bool]]:
 
 # --- Ek tespit yolları: e-posta ipucu, belge başlığı, yazım benzerliği -------------------------------
 
-_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_EMAIL = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")  # geri bakış: karesel süre olmasın
 # E-posta adresinin yerel kısmında ad olmayan, genel kullanılan sözcükler.
 _GENERIC_LOCAL = frozenset(
     """info bilgi mail email eposta iletisim contact admin ik hr destek support satis sales muhasebe
@@ -368,6 +370,9 @@ def _edit1_index() -> dict[str, set[str]]:
 
 
 _EDIT1 = _edit1_index()
+# Sözlükteki en uzun ad: bundan uzun sözcükler için tek harf farkı ya da ad öneki aranmaz (sonuç değişmez;
+# yüz binlerce harflik tek sözcükte silme kümesi ve önek dilimleme ikinci dereceden sürüyordu, F11/F18).
+_FIRST_MAX = max(map(len, _FIRST_FOLDED))
 
 
 @lru_cache(maxsize=65536)
@@ -377,7 +382,7 @@ def _near_first_name(word: str) -> str | None:
     Kısa sözcükler ("Bilgi" ~ "Bilge") sıradan kelimelerle karışacağı için en az 6 harf aranır.
     """
     f = fold(word)
-    if len(f) < 6 or f in _FIRST_FOLDED:
+    if len(f) < 6 or len(f) > _FIRST_MAX + 1 or f in _FIRST_FOLDED:
         return None
     for key in {f, *(f[:i] + f[i + 1:] for i in range(len(f)))}:
         for name in _EDIT1.get(key, ()):
@@ -588,7 +593,7 @@ def find_url_names(text: str, hints: frozenset[str] = frozenset()) -> Iterator[t
                     yield a, nb, "orta", "web adresinde ad ve soyad"
                     continue
             # Bitişik ad+soyad ("nuribayar"): ad sözlükte olan en uzun önek.
-            for k in range(len(f) - 3, 2, -1):
+            for k in range(min(len(f) - 3, _FIRST_MAX), 2, -1):
                 if f[:k] in _FIRST_FOLDED:
                     rest = f[k:]
                     if rest in _URL_WORDS or not rest.isalpha():

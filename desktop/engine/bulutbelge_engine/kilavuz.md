@@ -45,10 +45,10 @@ Ayarlar'daki **Ajan yönergesini kopyala** düğmesi aşağıdaki hazır yönerg
 
 | Kurulum | Komut |
 |---|---|
-| Windows, NSIS kurulumu (önerilen) | `bulutbelge <komut>`: kurulum, klasörü kullanıcının PATH'ine ekler ve `bulutbelge` kısa adını yazar (**yeni açılan** terminalde geçerli). Dosya: `%LOCALAPPDATA%\BulutBelge\bulutbelge-engine.exe` |
-| Windows, MSI | MSI PATH'e dokunmaz: `"C:\Program Files\BulutBelge\bulutbelge-engine.exe" <komut>` (varsayılan kurulum klasörü) |
-| macOS | `/Applications/BulutBelge.app/Contents/MacOS/bulutbelge-engine <komut> ...` |
-| Linux (.deb) | `bulutbelge-engine <komut> ...` (`/usr/bin`'e kurulur; AppImage'da komut satırı yoktur, .deb kullanın) |
+| Windows, NSIS kurulumu (önerilen) | `bulutbelge <komut>`: kurulum, klasörü kullanıcının PATH'ine ekler ve `bulutbelge` kısa adını yazar (**yeni açılan** terminalde geçerli). Dosya: `%LOCALAPPDATA%\BulutBelge\engine\bulutbelge-engine.exe` |
+| Windows, MSI | MSI PATH'e dokunmaz: `"C:\Program Files\BulutBelge\engine\bulutbelge-engine.exe" <komut>` (varsayılan kurulum klasörü) |
+| macOS | `/Applications/BulutBelge.app/Contents/Resources/engine/bulutbelge-engine <komut> ...` (macOS'ta denenmedi) |
+| Linux (.deb) | `bulutbelge <komut> ...` (paket `/usr/bin/bulutbelge` kısa adını ve `man bulutbelge` sayfasını kurar; tam yol `/usr/lib/BulutBelge/engine/bulutbelge-engine`. Linux'ta denenmedi; AppImage'da komut satırı yoktur, .deb kullanın) |
 | Geliştirme ortamı | `desktop/engine/.venv/bin/python -m bulutbelge_engine.cli <komut>` (Windows: `.venv\Scripts\python.exe`) |
 | `pip install -e desktop/engine` yapıldıysa | `bulutbelge <komut>` |
 
@@ -56,7 +56,7 @@ Kurulu uygulamada komut, uygulamayla gelen motor dosyasıdır: aynı dosya argü
 
 Bu kılavuzda kısalık için `bulutbelge <komut>` yazılır; sizdeki karşılığını kullanın. OCR için dil dosyaları motorun yanındadır (paketli sürümde gömülü); geliştirme ortamında `BULUTBELGE_TESSDATA` ile `desktop/engine/tessdata` gösterilmelidir, yoksa taranmış sayfalar okunamaz.
 
-Ayar klasörü sırasıyla `--veri-klasoru`, `BULUTBELGE_DATA_DIR` ya da masaüstü uygulamasının klasöründen (Windows `%APPDATA%\com.proteksistem.bulutbelge`, macOS `~/Library/Application Support/com.proteksistem.bulutbelge`) alınır. Ajan genellikle bunlara dokunmaz; masaüstü uygulamasındaki ayarlar kullanılır.
+Ayar klasörü her zaman masaüstü uygulamasının klasörüdür (Windows `%APPDATA%\com.proteksistem.bulutbelge`, macOS `~/Library/Application Support/com.proteksistem.bulutbelge`, Linux `~/.local/share/com.proteksistem.bulutbelge`); izinler, kural takımları ve işlem günlüğü oradan okunur. Ajan bu klasörü seçemez: `--veri-klasoru` reddedilir (çıkış kodu 2), `BULUTBELGE_DATA_DIR` yok sayılır. İkisi yalnızca geliştirme ve testte, `BULUTBELGE_GELISTIRME=1` ortam değişkeniyle kabul edilir; ajana bu değişkeni verilen bir ortamda çalıştırmayın.
 
 ## Komutlar
 
@@ -67,7 +67,7 @@ Ayar klasörü sırasıyla `--veri-klasoru`, `BULUTBELGE_DATA_DIR` ya da masaüs
 | `folders [--json]` | İzinli klasörleri ve yazma iznini gösterir. İlk çağrı olarak iyi bir denetimdir. |
 | `kilavuz [--yonerge]` | Bu kılavuzu (ya da yalnızca hazır yönergeyi) yazdırır. İzin ya da ayar gerektirmez, günlüğe girmez. |
 
-Ortak seçenekler: `--ajan AD` günlüğe yazılacak ajan adı (örn. `claude-code`); `--profil ID` kural takımı; `--json` makine okunur çıktı.
+Ortak seçenekler: `--ajan AD` günlüğe yazılacak ajan adı (örn. `claude-code`; yalnızca harf, rakam, `.`, `_`, `-`, harf ya da rakamla başlar, aksi hâlde çıkış kodu 2); `--profil ID` kural takımı; `--json` makine okunur çıktı.
 
 ### Örnek çıktılar (sahte veri)
 
@@ -182,7 +182,7 @@ Aşağıdaki metni ajanın talimat dosyasına ekleyin: Claude Code için `CLAUDE
 ```markdown
 ## Yerel belgeler: yalnızca BulutBelge ile oku
 
-Kişisel veri içerebilecek yerel belgeleri (PDF, Word, Excel, PowerPoint, XML, CSV, TXT, görsel)
+Kişisel veri içerebilecek yerel belgeleri (PDF, Word, Excel, PowerPoint, XML, CSV, JSON, TXT, LOG, görsel)
 doğrudan açma, okuma ya da içeriklerini kopyalama. Her zaman BulutBelge komutunu kullan.
 (Komut PATH'te değilse tam yolunu yaz; örn. bulutbelge-engine ya da python -m bulutbelge_engine.cli.)
 

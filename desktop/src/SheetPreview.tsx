@@ -14,6 +14,7 @@ interface Sheet {
   name: string;
   cols: number;
   rows: { row: number; cells: Cell[] }[];
+  hidden?: boolean;
 }
 
 /** Elle seçilen satır ya da sütun (satır 1'den, sütun 0'dan). */
@@ -273,6 +274,7 @@ export function SheetPreview({
             {sheets.map((s, i) => (
               <button key={s.name + i} role="tab" aria-selected={i === active} className={i === active ? "on" : undefined} onClick={() => setActive(i)}>
                 {s.name}
+                {s.hidden && <small className="xl-hidden-badge">(Gizli)</small>}
                 {counts[i] > 0 && <b>{counts[i]}</b>}
               </button>
             ))}

@@ -1,4 +1,4 @@
-import { Fragment, ReactNode, useEffect, useRef, useState } from "react";
+import { CSSProperties, Fragment, ReactNode, useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { CategoryGroup, groupText } from "./categories";
 import { DataTypeInfo, DocFormat, engineCall, extOf, MaskResult, PdfFinding, Rules, ScanResult } from "./engine";
@@ -892,7 +892,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
       <li key={docPath}>
         <button
           type="button"
-          className={["studio-doc-item", isCurrent ? "active" : "", isDone ? "done" : ""].join(" ")}
+          className={["studio-doc-item", isCurrent ? "active" : "", isDone ? "done" : "", isCurrent && (p.batchProgress || p.busy) ? "calisiyor" : ""].join(" ")}
           onClick={() => {
             setInspectedRecentTarget(null);
             if (docPath !== p.source) p.switchDoc(docPath);
@@ -964,7 +964,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
   const shellStyle = {
     "--studio-left-w": panelPrefs.leftCollapsed ? "0px" : `${panelPrefs.leftWidth}px`,
     "--studio-right-w": panelPrefs.rightCollapsed ? "0px" : `${panelPrefs.rightWidth}px`,
-  } as React.CSSProperties;
+  } as CSSProperties;
 
   return (
     <div
@@ -1145,7 +1145,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                         {isDropped ? (
                           <span className="studio-page-tag dropped">{t("Çıkarıldı")}</span>
                         ) : pgFindings.length > 0 ? (
-                          <span className="studio-page-tag">{t("{a}/{b} gizli", { a: pgActive, b: pgFindings.length })}</span>
+                          <span className="studio-page-tag">{t("{a}/{b} maskeli", { a: pgActive, b: pgFindings.length })}</span>
                         ) : (
                           <span className="studio-page-tag clean">{t("Temiz")}</span>
                         )}
@@ -1677,7 +1677,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                   <div className="studio-compare-pane after">
                     <div className="studio-compare-head">
                       <span className="studio-compare-tag after">
-                        {t("SONRASI · Maskelenmiş ({n} gizli)", { n: inspectedRecent.count })}
+                        {t("SONRASI · Maskelenmiş ({n} maskeli)", { n: inspectedRecent.count })}
                       </span>
                       <span className="studio-compare-fname" title={inspectedRecent.target}>
                         {splitPath(inspectedRecent.target).name}
@@ -1740,7 +1740,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                 </div>
                 <span className="home-pick">{t("Bilgisayardan belge seç")}</span>
                 <span className="home-formats">
-                  {t("PDF · Word · Excel · PowerPoint · Fotoğraf · XML, TXT, CSV · Çoklu belge ve klasör desteklenir")}
+                  {t("PDF · Word · Excel · PowerPoint · Fotoğraf · XML, CSV, JSON, TXT, LOG · Çoklu belge ve klasör desteklenir")}
                 </span>
               </button>
               <p className="home-alt">
@@ -1750,12 +1750,20 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                 </button>
               </p>
             </div>
-          ) : p.busy === "scan" ? (
+          ) : p.busy === "scan" || p.batchProgress?.mode === "scan" ? (
             <div className="studio-center-loading">
               <div className="loading-card">
-                <span className="spinner" aria-hidden />
+                <span className="tara-belge" aria-hidden><i /><i /><i /><i /></span>
                 <b>{t("Seçilen kural uygulanıyor ve kişisel bilgiler taranıyor…")}</b>
                 <span>{splitPath(p.source).name}</span>
+                {p.batchProgress?.mode === "scan" && (
+                  <>
+                    <span className="ilerleme-serit" aria-hidden>
+                      <i style={{ width: `${Math.round((p.batchProgress.done / Math.max(1, p.batchProgress.total)) * 100)}%` }} />
+                    </span>
+                    <small>{t("Taranıyor ({done}/{total})…", { done: p.batchProgress.done, total: p.batchProgress.total })}</small>
+                  </>
+                )}
                 {(p.format === "gorsel" || p.format === "pdf") && (
                   <small>{t("Fotoğraf ve taranmış sayfalarda OCR biraz sürebilir.")}</small>
                 )}
@@ -2243,9 +2251,13 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                 <button
                   type="button"
                   className={
-                    !p.scan || hasUnappliedRuleChange
-                      ? "btn primary studio-apply-btn"
-                      : "btn studio-apply-btn"
+                    (!p.scan || hasUnappliedRuleChange ? "btn primary studio-apply-btn" : "btn studio-apply-btn") +
+                    (p.busy === "scan" || p.batchProgress?.mode === "scan" ? " is-busy" : "")
+                  }
+                  style={
+                    p.batchProgress?.mode === "scan"
+                      ? ({ "--ilerleme": `${Math.round((p.batchProgress.done / Math.max(1, p.batchProgress.total)) * 100)}%` } as CSSProperties)
+                      : undefined
                   }
                   disabled={p.busy !== null || p.batchProgress !== null}
                   onClick={() => p.onApplyRules?.()}
@@ -2534,13 +2546,18 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                   <div className="studio-save-group">
                     <button
                       type="button"
-                      className="btn primary big studio-save-btn"
+                      className={"btn primary big studio-save-btn" + (p.batchProgress?.mode === "mask" ? " is-busy" : "")}
+                      style={
+                        p.batchProgress?.mode === "mask"
+                          ? ({ "--ilerleme": `${Math.round((p.batchProgress.done / Math.max(1, p.batchProgress.total)) * 100)}%` } as CSSProperties)
+                          : undefined
+                      }
                       disabled={p.busy !== null || p.batchProgress !== null}
                       onClick={p.runMaskAll}
                     >
                       <Icon name="shield" size={17} />
                       {p.batchProgress?.mode === "mask"
-                        ? t("Maskeleniyor ({done}/{total})…", { done: p.batchProgress.done, total: p.batchProgress.total })
+                        ? t("Kaydediliyor ({done}/{total})…", { done: p.batchProgress.done, total: p.batchProgress.total })
                         : t("Tüm Belgeleri Maskele ve Kaydet ({n} belge)", { n: docList.length })}
                     </button>
                     <button
@@ -2557,7 +2574,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                 ) : (
                   <button
                     type="button"
-                    className="btn primary big studio-save-btn"
+                    className={"btn primary big studio-save-btn" + (p.busy === "mask" ? " is-busy" : "")}
                     disabled={!p.canSave}
                     onClick={p.runMask}
                   >
@@ -2570,6 +2587,25 @@ export function StudioWorkspace(p: SharedLayoutProps) {
           </>
         )}
       </aside>
+
+      {(p.busy === "mask" || p.batchProgress?.mode === "mask") && p.source && (
+        <div className="maske-ortu" role="status" aria-live="polite">
+          <div className="loading-card">
+            <span className="tara-belge maske" aria-hidden><i /><i /><i /><i /></span>
+            <b>
+              {p.batchProgress?.mode === "mask"
+                ? t("Kaydediliyor ({done}/{total})…", { done: p.batchProgress.done, total: p.batchProgress.total })
+                : t("Kaydediliyor…")}
+            </b>
+            <span>{splitPath(p.source).name}</span>
+            {p.batchProgress?.mode === "mask" && (
+              <span className="ilerleme-serit" aria-hidden>
+                <i style={{ width: `${Math.round((p.batchProgress.done / Math.max(1, p.batchProgress.total)) * 100)}%` }} />
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {confirmDeleteRecent && (
         <div
@@ -2919,7 +2955,7 @@ export function WizardWorkspace(p: SharedLayoutProps) {
                     </span>
                     <span className="home-pick">{t("Bilgisayardan seç")}</span>
                     <span className="home-formats">
-                      {t("PDF · Word · Excel · PowerPoint · Fotoğraf · XML, TXT, CSV")}
+                      {t("PDF · Word · Excel · PowerPoint · Fotoğraf · XML, CSV, JSON, TXT, LOG")}
                     </span>
                   </button>
                   <p className="home-alt center">
@@ -2981,7 +3017,7 @@ export function WizardWorkspace(p: SharedLayoutProps) {
             {!p.scan ? (
               <div className="wizard-loading-wrap">
                 <div className="loading-card">
-                  <span className="spinner" aria-hidden />
+                  <span className="tara-belge" aria-hidden><i /><i /><i /><i /></span>
                   <b>{t("Adım 2 Hazırlanıyor: Kişisel bilgiler aranıyor…")}</b>
                   <span>{splitPath(p.source!).name}</span>
                 </div>

@@ -158,7 +158,7 @@ def _extract_supported(src: Path, workdir: Path, rules: Rules) -> tuple[list[tup
         raise PdfError(f"ZIP okunamadı: {exc}") from None
 
     if not extracted:
-        raise PdfError("Arşivde desteklenen belge bulunamadı (PDF, XML, Office, TXT, CSV, görsel)")
+        raise PdfError("Arşivde desteklenen belge bulunamadı (PDF, XML, Office, metin, CSV, görsel)")
     warnings: list[str] = []
     if skipped:
         warnings.append(f"Arşivdeki {skipped} desteklenmeyen girdi güvenlik nedeniyle atlandı.")

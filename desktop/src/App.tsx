@@ -161,7 +161,7 @@ function sourceFilters(f: FormatsInfo | null) {
     { name: "Excel", extensions: f.tablo },
     { name: "PowerPoint", extensions: f.sunum },
     { name: t("Görseller"), extensions: f.gorsel },
-    { name: "XML, TXT, CSV", extensions: f.metin },
+    { name: "XML, CSV, JSON, TXT, LOG", extensions: f.metin },
     ...(f.eposta ? [{ name: t("E-posta"), extensions: f.eposta }] : []),
     ...(f.arsiv?.length ? [{ name: "ZIP", extensions: f.arsiv }] : []),
   ];
@@ -447,7 +447,7 @@ function App() {
   }
   const format: DocFormat | null = source ? formatOf(source, formats) : null;
 
-  // Taramadan önce metin ve arşiv belgelerinin (XML, TXT, CSV, ZIP) önizlemesi için içeriği oku.
+  // Taramadan önce metin ve arşiv belgelerinin (XML, CSV, JSON, TXT, LOG, ZIP) önizlemesi için içeriği oku.
   useEffect(() => {
     setDocText(null);
     const fmt = source ? formatOf(source, formats) : null;
@@ -1045,7 +1045,6 @@ function App() {
         drop_pages: format === "pdf" ? [...dropped].sort((a, b) => a - b) : [],
         password: format === "pdf" && protect ? password : undefined,
         flatten: format === "pdf" && flatten,
-        fixed_box: profile?.fixed_box === true,
         make_dirs: true,
       });
       setDone(result);
@@ -1136,7 +1135,6 @@ function App() {
           drop_pages: docFmt === "pdf" ? [...st.dropped].sort((a, b) => a - b) : [],
           password: docFmt === "pdf" && protect ? password : undefined,
           flatten: docFmt === "pdf" && docPath === source && flatten,
-          fixed_box: profile?.fixed_box === true,
           make_dirs: true,
         });
         const updatedState: DocState = { ...st, target: docTarget, done: result };
@@ -1574,9 +1572,9 @@ function App() {
             <Icon name="upload" size={34} />
           </span>
           <b>{t("Belgeleri buraya bırakın")}</b>
-          <span>{t("İsim, TC kimlik, telefon, adres gibi kişisel bilgileri bulup gizliyoruz. Ne maskeleneceğini sonra siz seçersiniz.")}</span>
+          <span>{t("İsim, TC kimlik, telefon, adres gibi kişisel bilgileri bulup maskeliyoruz. Ne maskeleneceğini sonra siz seçersiniz.")}</span>
           <span className="home-pick">{t("Bilgisayardan seç")}</span>
-          <span className="home-formats">{t("PDF · Word · Excel · PowerPoint · fotoğraf · XML, TXT, CSV, ZIP · birden çok dosya olabilir")}</span>
+          <span className="home-formats">{t("PDF · Word · Excel · PowerPoint · fotoğraf · XML, CSV, JSON, TXT, LOG, ZIP · birden çok dosya olabilir")}</span>
         </button>
         <p className="home-alt">
           {t("Bir klasördeki bütün belgeler mi?")}{" "}
@@ -1626,7 +1624,7 @@ function App() {
         {errorBanner}
         {busy === "scan" ? (
           <div className="loading-card">
-            <span className="spinner" aria-hidden />
+            <span className="tara-belge" aria-hidden><i /><i /><i /><i /></span>
             <b>{t("Kişisel bilgiler aranıyor…")}</b>
             <span>{splitPath(source).name}</span>
             {(format === "gorsel" || format === "pdf") && <small>{t("Fotoğraf ve taranmış sayfalarda biraz sürebilir.")}</small>}
@@ -1783,7 +1781,7 @@ function App() {
         />
 
         <div className="result-actions">
-          <button className="btn primary big" disabled={!canSave} onClick={runMask}>
+          <button className={"btn primary big" + (busy === "mask" ? " is-busy" : "")} disabled={!canSave} onClick={runMask}>
             {allFindings.length === 0 && pagesOut === 0 ? t("Maskelenecek bilgi yok") : saveLabel}
           </button>
         </div>
@@ -2123,7 +2121,7 @@ function LeftOpen({ findings }: { findings: PdfFinding[] }) {
     return (
       <div className="left-open ok">
         <Icon name="shield" size={16} />
-        <span>{t("Bulunan kişisel bilgilerin hepsi kopyada gizli.")}</span>
+        <span>{t("Bulunan kişisel bilgilerin hepsi kopyada maskelendi.")}</span>
       </div>
     );
   }

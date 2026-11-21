@@ -1,0 +1,9 @@
+# Gitleaks ayarı (TAKIP T3): varsayılan kurallar + testlerdeki sahte parola.
+title = "BulutBelge gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Testlerde kullanılan sahte parola (gerçek değil)"
+regexes = ['''sahte-parola-123''']

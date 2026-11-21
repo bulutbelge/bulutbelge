@@ -392,14 +392,3 @@ def test_profile_export_import_via_file(tmp_path):
     assert e.value.code == "invalid_pack"
     with pytest.raises(EngineError):
         call("profiles.export", target=str(tmp_path / "yok-klasor" / "a.json"))
-
-
-def test_profile_fixed_box_saved_default_off():
-    s = call("settings.get")
-    assert "fixed_box" not in s["profiles"][0]
-    p = {**s["profiles"][0], "fixed_box": True}
-    call("settings.save", profiles=[p, *s["profiles"][1:]], active="varsayilan")
-    assert call("settings.get")["profiles"][0]["fixed_box"] is True
-    p2 = {**p, "fixed_box": False}
-    call("settings.save", profiles=[p2, *s["profiles"][1:]], active="varsayilan")
-    assert "fixed_box" not in call("settings.get")["profiles"][0]

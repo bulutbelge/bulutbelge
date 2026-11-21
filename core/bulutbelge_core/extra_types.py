@@ -343,7 +343,7 @@ def find_vins(text: str) -> Iterator[tuple[int, int]]:
 # Değer tamamen rakamsa ve 8 veya daha fazla rakam içeriyorsa EŞLEŞME YOK (sgk türü onu zaten alıyor; çift tespit olmasın).
 _SICIL_LABEL = re.compile(
     r"(?i)\b(?:(?:personel|kurum|memur)?\s*sicil(?:\s+numarası)?)(?:\s*no\.?|\s*numarası)?\s*"
-    r"[:#-]?\s*([a-zA-Z0-9-]{3,20})(?![a-zA-Z0-9])"
+    r"(?:[:#-]\s*)?([a-zA-Z0-9-]{3,20})(?![a-zA-Z0-9])"
 )
 
 
@@ -503,3 +503,41 @@ def find_title_institution(text: str) -> Iterator[tuple[int, int]]:
         for w in words[:skip]:
             start = text.index(w, start) + len(w)
         yield start, m.end("unvan")
+# ---------- Gizli anahtar / Token ----------
+
+_PEM_KEY = re.compile(
+    r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----[\s\S]{10,4096}?-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"
+)
+_API_TOKEN = re.compile(
+    r"(?<![A-Za-z0-9_-])(?:"
+    r"sk-(?:proj-|ant-|live-|test-)?[A-Za-z0-9_-]{20,}"
+    r"|gh[pou]_[A-Za-z0-9]{20,}"
+    r"|github_pat_[A-Za-z0-9_]{20,}"
+    r"|AKIA[0-9A-Z]{16}"
+    r"|AIza[0-9A-Za-z_-]{35}"
+    r"|xox[baprs]-[0-9A-Za-z-]{16,}"
+    r"|bb_[A-Za-z0-9_-]{16,}"
+    r")(?![A-Za-z0-9_-])"
+)
+_JWT = re.compile(
+    r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{6,}\.eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])"
+)
+_DB_URI = re.compile(
+    r"(?i)\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|amqp|mssql)"
+    r"://[^:/\s@]{1,64}:[^@\s/]{4,128}@[^\s\"'<>]+"
+)
+
+
+def find_secrets(text: str) -> Iterator[tuple[int, int]]:
+    """API anahtarları, JWT, PEM özel anahtarları ve parola içeren veritabanı URI'lerini bulur."""
+    spans: list[tuple[int, int]] = []
+    for rx in (_PEM_KEY, _API_TOKEN, _JWT, _DB_URI):
+        for m in rx.finditer(text):
+            spans.append((m.start(), m.end()))
+    spans.sort(key=lambda s: (s[0], -(s[1] - s[0])))
+    last_end = -1
+    for start, end in spans:
+        if start >= last_end:
+            yield start, end
+            last_end = end
+

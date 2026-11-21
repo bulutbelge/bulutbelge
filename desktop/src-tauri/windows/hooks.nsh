@@ -6,7 +6,7 @@
 !macro NSIS_HOOK_POSTINSTALL
   ; Kısa ad: bulutbelge.cmd -> motor exe'si (argümanla çağrılınca ajan komutu olarak çalışır).
   FileOpen $0 "$INSTDIR\bulutbelge.cmd" w
-  FileWrite $0 `@"%~dp0bulutbelge-engine.exe" %*$\r$\n`
+  FileWrite $0 `@"%~dp0engine\bulutbelge-engine.exe" %*$\r$\n`
   FileClose $0
   ; Kurulum klasörünü kullanıcı PATH'ine ekle (zaten varsa dokunma).
   nsExec::ExecToLog `powershell.exe -NoProfile -NonInteractive -Command "$$d='$INSTDIR'; $$p=[Environment]::GetEnvironmentVariable('Path','User'); if (-not (($$p -split ';') -contains $$d)) { [Environment]::SetEnvironmentVariable('Path', (($$p.TrimEnd(';') + ';' + $$d).TrimStart(';')), 'User') }"`

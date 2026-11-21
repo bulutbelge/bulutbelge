@@ -45,8 +45,10 @@ OFFICE_KINDS = {"word": office.WORD, "sunum": office.POWERPOINT, "tablo": office
 
 
 def _office_masker(fmt: office.OfficeFormat):
-    def run(source, target, rules, excluded, make_dirs=False, counts=None, manual_cells=None):
-        return office.mask(source, target, fmt, rules, excluded, make_dirs, counts=counts, manual_cells=manual_cells)
+    def run(source, target, rules, excluded, make_dirs=False, counts=None, manual_cells=None, options=None):
+        return office.mask(
+            source, target, fmt, rules, excluded, make_dirs, counts=counts, manual_cells=manual_cells, options=options
+        )
 
     return run
 
@@ -416,6 +418,12 @@ def _doc_mask(params: dict[str, Any]) -> dict[str, Any]:
             raise EngineError("invalid_params", "Parolayla koruma yalnızca PDF için")
         counts: dict[str, int] = {}
         extra = {"manual_cells": cells} if cells else {}
+        raw_excel = params.get("excel_options")
+        if kind == "tablo" and isinstance(raw_excel, dict):
+            # İsteğe bağlı Excel güvenli temizlik: gizli sayfaları görünür yap, formülleri düzleştir, yorum/grafik içini sil.
+            extra["options"] = {
+                k: bool(raw_excel.get(k)) for k in ("unhide_sheets", "flatten_formulas", "strip_comments", "strip_charts")
+            }
         out, masked, warnings = DOC_MASKERS[kind](
             source, target, rules, {str(x) for x in excluded}, make_dirs=bool(params.get("make_dirs")), counts=counts, **extra
         )
@@ -433,11 +441,14 @@ def _doc_mask(params: dict[str, Any]) -> dict[str, Any]:
         password=_password(params.get("password")),
         counts=counts,
         watermark=_watermark(params, source),
-        fixed_box=bool(params.get("fixed_box")),
         flatten=bool(params.get("flatten")),
+        mask_pages=_page_spec(params.get("mask_pages"), "mask_pages"),
+        exclude_pages=_page_spec(params.get("exclude_pages"), "exclude_pages"),
+        strip_bookmarks=params.get("strip_bookmarks", True) is not False,
     )
     _keep_pseudonyms(rules)
     return {
+        "flattened": result.flattened,
         "counts": counts,
         "target": result.target,
         "masked": result.masked,
@@ -491,6 +502,17 @@ def _drop_pages(raw: Any) -> list[int]:
     if not isinstance(raw, list) or not all(isinstance(x, int) for x in raw):
         raise EngineError("invalid_params", "'drop_pages' sayı listesi olmalı")
     return raw
+
+
+def _page_spec(raw: Any, name: str) -> str | list[int] | None:
+    """Sayfa aralığı: metin ("4-6", "1, 4-5, 7", "tek") ya da sayı listesi; boşsa None (hepsi)."""
+    if raw in (None, "", []):
+        return None
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in raw):
+        return raw
+    raise EngineError("invalid_params", f"'{name}' sayfa aralığı metni (ör. 4-6) veya sayı listesi olmalı")
 
 
 @_previewed
@@ -564,7 +586,7 @@ def doc_page(params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _manual_areas(raw: Any) -> list[tuple[int, tuple[float, float, float, float]]]:
+def _manual_areas(raw: Any) -> list[tuple]:
     if not raw:
         return []
     if not isinstance(raw, list):
@@ -573,7 +595,11 @@ def _manual_areas(raw: Any) -> list[tuple[int, tuple[float, float, float, float]
     for a in raw:
         try:
             x0, y0, x1, y1 = (float(v) for v in a["rect"])
-            out.append((int(a["page"]), (x0, y0, x1, y1)))
+            reason = a.get("reason")
+            if isinstance(reason, str) and reason.strip():
+                out.append((int(a["page"]), (x0, y0, x1, y1), reason.strip()[:40]))  # "[gerekçe]" etiketi yazılır
+            else:
+                out.append((int(a["page"]), (x0, y0, x1, y1)))
         except (KeyError, TypeError, ValueError):
             raise EngineError("invalid_params", "Elle seçilen alan biçimi geçersiz") from None
     return out

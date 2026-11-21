@@ -13,8 +13,6 @@ export interface Profile {
   column_rules?: ColumnRule[];
   signature_labels: string[];
   pseudonym_scope?: "belge";
-  /** PDF/görselde sabit genişlikte karartma kutusu (TAKIP 1.59); varsayılan kapalı. */
-  fixed_box?: boolean;
 }
 
 export interface VaultStatus {

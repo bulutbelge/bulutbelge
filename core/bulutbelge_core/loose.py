@@ -1,4 +1,4 @@
-"""Karışık yazılmış TC, IBAN ve telefon numaraları (TAKIP 1.62).
+"""Karışık yazılmış TC, IBAN, telefon, kart ve VKN numaraları (TAKIP 1.62).
 
 Aralıklı, noktalı, parantezli, tam genişlikli rakamlar, OCR karışıklıkları
 (O/0, l/1, I/1, S/5) ve (IBAN için) satır bölünmesi burada normalleştirilir.
@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import re
 
-from .validators import iban_valid, tc_kimlik_valid
+from .labels import label_before, label_kind
+from .validators import iban_valid, luhn_valid, tc_kimlik_valid, vkn_valid
 
 _OCR = {"O": "0", "o": "0", "l": "1", "I": "1", "S": "5"}
 _DL = r"[\d OolIS]".replace(" ", "")
@@ -19,8 +20,20 @@ _SEP = r"(?:[ .\-()/ ]{1,2})"
 _RUN = re.compile(rf"(?<![\w+])\+?{_DL}(?:{_SEP}?{_DL})+(?![\w])")
 # TR + 24 hane; ayraç olarak tek satır sonu da olabilir.
 # Satır sonundan önce boşluk/tire, sonra en çok iki satır sonu (PDF'de blok sınırı) olabilir.
-_IBAN_SEP = r"(?:[ .\-\u00a0]{0,2}(?:\r?\n){0,2}[ \u00a0]*)"
+# Dil `[ .\-\u00a0]{0,2}(?:\r?\n){0,2}[ \u00a0]*` ile aynı; ama eski biçimde iki boşluk üç ayrı biçimde
+# bölünebildiği için {24} tekrar başarısız olunca üstel geri izliyordu (güvenlik taraması F3/F5).
+# Satır sonu varsa (1), yoksa en az iki karakter (2) ya da en çok bir karakter (3): her dizi tek biçimde bölünür.
+_IBAN_SEP = (
+    r"(?:[ .\-\u00a0]{0,2}(?:\r?\n){1,2}[ \u00a0]*"
+    r"|[ .\-\u00a0]{2}[ \u00a0]*"
+    r"|[ .\-\u00a0]?)"
+)
 _IBAN = re.compile(rf"(?<![\w])[Tt][Rr](?:{_IBAN_SEP}{_DL}){{24}}(?![\w])")
+# Satır sonundan bölünmüş kart numarası (13-19 hane); yalnızca kart etiketiyle kabul edilir.
+_CARD_WRAP = re.compile(rf"(?<![\w]){_DL}(?:{_IBAN_SEP}{_DL}){{12,18}}(?![\w])")
+# Satır sonundan bölünmüş TC (11 hane) ve telefon (10-12 hane, başta + olabilir); yalnızca türün etiketiyle.
+# Eşleşme sonraki satırdaki başka bir sayıyı da yutabileceği için her hane sınırında kısa adaylar da denenir.
+_NUM_WRAP = re.compile(rf"(?<![\w+])\+?{_DL}(?:{_IBAN_SEP}{_DL}){{9,18}}(?![\w])")
 
 
 # E-posta: "@" yerine [at] (at) {at} [@] (@) ＠, "." yerine [dot] (dot) {dot} [nokta]. Düz "at" sözcüğü
@@ -28,7 +41,7 @@ _IBAN = re.compile(rf"(?<![\w])[Tt][Rr](?:{_IBAN_SEP}{_DL}){{24}}(?![\w])")
 _AT = r"(?:\s?[\[(\{]\s?(?:at|@)\s?[\])\}]\s?|＠)"
 _DOT = r"(?:\s?[\[(\{]\s?(?:dot|nokta)\s?[\])\}]\s?|\.)"
 _MAIL = re.compile(
-    rf"(?<![\w.])[A-Za-z0-9][A-Za-z0-9._%+-]*{_AT}[A-Za-z0-9-]+(?:{_DOT}[A-Za-z0-9-]+)*{_DOT}[A-Za-z]{{2,}}(?![\w])",
+    rf"(?<![\w.%+-])[A-Za-z0-9][A-Za-z0-9._%+-]*{_AT}[A-Za-z0-9-]+(?:{_DOT}[A-Za-z0-9-]+)*{_DOT}[A-Za-z]{{2,}}(?![\w])",
     re.IGNORECASE,
 )
 
@@ -62,15 +75,27 @@ def find_mixed_email(text: str) -> list[tuple[int, int]]:
     return [(m.start(), m.end()) for m in _MAIL.finditer(text)]
 
 
-def find_mixed(text: str, tc: bool = True, iban: bool = True, phone: bool = True) -> list[tuple[str, int, int, str]]:
-    """(tür, başlangıç, bitiş, güven) listesi; güven "yuksek" ya da "orta" (OCR harfi varsa)."""
+def _label_is(text: str, start: int, kind: str) -> bool:
+    return label_kind(label_before(text, start)) == kind
+
+
+def find_mixed(
+    text: str, tc: bool = True, iban: bool = True, phone: bool = True, vkn: bool = False, card: bool = False
+) -> list[tuple[str, int, int, str]]:
+    """(tür, başlangıç, bitiş, güven) listesi; güven "yuksek" ya da "orta" (OCR harfi varsa).
+
+    Kart (13-19 hane) Luhn'dan geçmek zorundadır. VKN'nin kontrol hanesi zayıf olduğu (yaklaşık onda bir
+    rastgele sayı geçer) ve 10 haneli telefonla karışabildiği için karışık yazımda önünde vergi etiketi
+    ("Vergi No", "VKN") aranır; düz yazılmış VKN'yi asıl kalıp bulur. Satırdan bölünmüş kart da yalnızca
+    kart etiketiyle kabul edilir.
+    """
     found: list[tuple[str, int, int, str]] = []
     if iban:
         for m in _IBAN.finditer(text):
             d, real = _digits(m.group()[2:])
             if real >= 12 and iban_valid("TR" + d):
                 found.append(("iban", m.start(), m.end(), "orta" if real < len(d) else "yuksek"))
-    if tc or phone:
+    if tc or phone or vkn or card:
         for m in _RUN.finditer(text):
             raw = m.group()
             d, real = _digits(raw)
@@ -81,7 +106,45 @@ def find_mixed(text: str, tc: bool = True, iban: bool = True, phone: bool = True
                 found.append(("tc_kimlik", m.start(), m.end(), conf))
             elif phone and _phone_ok(d):
                 found.append(("telefon", m.start(), m.end(), conf))
+            elif card and 13 <= len(d) <= 19 and luhn_valid(d):
+                found.append(("kredi_karti", m.start(), m.end(), conf))
+            elif vkn and len(d) == 10 and vkn_valid(d) and _label_is(text, m.start(), "vkn"):
+                found.append(("vkn", m.start(), m.end(), conf))
+    if card:
+        for m in _CARD_WRAP.finditer(text):
+            if "\n" not in m.group():
+                continue
+            d, real = _digits(m.group())
+            if real >= 12 and 13 <= len(d) <= 19 and luhn_valid(d) and _label_is(text, m.start(), "kredi_karti"):
+                found.append(("kredi_karti", m.start(), m.end(), "orta" if real < len(d) else "yuksek"))
+    if tc or phone:
+        for m in _NUM_WRAP.finditer(text):
+            if "\n" not in m.group():
+                continue
+            hit = _wrapped_labeled(text, m, tc, phone)
+            if hit and not any(s < hit[2] and hit[1] < e for _k, s, e, _c in found):
+                found.append(hit)
     return found
+
+
+def _wrapped_labeled(text: str, m: re.Match, tc: bool, phone: bool) -> tuple[str, int, int, str] | None:
+    """Satır sonundan bölünmüş, önünde kendi etiketi olan TC ya da telefon; en uzun geçerli önek alınır."""
+    kind = label_kind(label_before(text, m.start()))
+    if not (tc and kind == "tc_kimlik" or phone and kind == "telefon"):
+        return None
+    raw = m.group()
+    sonlar = [i + 1 for i, ch in enumerate(raw) if ch in _OCR or ch.isdigit()]
+    for son in reversed(sonlar):
+        parca = raw[:son]
+        if "\n" not in parca:
+            break  # satır bölünmesi olmayanı asıl kalıplar bulur
+        d, real = _digits(parca)
+        if real < 7:
+            break
+        ok = len(d) == 11 and tc_kimlik_valid(d) if kind == "tc_kimlik" else _phone_ok(d) and real >= len(d) - 1
+        if ok:
+            return (kind, m.start(), m.start() + son, "orta")
+    return None
 
 
 # Hücreler arası bölünmüş değer (Excel/tablo): bir satırda yan yana hücrelere dağılmış parçalar.

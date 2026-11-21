@@ -22,11 +22,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
 APP_ID = "com.proteksistem.bulutbelge"
+DEV_ENV = "BULUTBELGE_GELISTIRME"
+# --ajan değeri işlem günlüğüne ve CSV dışa aktarımına girer: güvenli karakter kümesi (F15).
+_AGENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_REFUSED, EXIT_LOG = 0, 1, 2, 3, 4
 
@@ -134,6 +138,11 @@ def subcommands(parser: argparse.ArgumentParser) -> dict[str, argparse.ArgumentP
     return {}
 
 
+def dev_mode() -> bool:
+    """Geliştirme/test modu: yalnızca BULUTBELGE_GELISTIRME=1 iken ayar klasörü elle seçilebilir."""
+    return os.environ.get(DEV_ENV) == "1"
+
+
 def default_data_dir() -> Path:
     """Masaüstü uygulamasının (Tauri app_data_dir) kullandığı klasör."""
     if os.name == "nt":
@@ -156,7 +165,10 @@ def _parser() -> argparse.ArgumentParser:
         epilog=_epilog("main") + "\n\nKomutlar için: bulutbelge <komut> --help",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--veri-klasoru", help="Uygulamanın ayar klasörü (varsayılan: masaüstü uygulamasınınki)")
+    p.add_argument(
+        "--veri-klasoru",
+        help=f"Uygulamanın ayar klasörü; yalnızca geliştirme modunda ({DEV_ENV}=1). Varsayılan: masaüstü uygulamasınınki",
+    )
     sub = p.add_subparsers(dest="command", required=True)
 
     common = argparse.ArgumentParser(add_help=False)
@@ -264,8 +276,33 @@ def run(argv: list[str], stdout, stderr) -> int:
         stdout.write(kilavuz.guide_prompt(kilavuz.command_here()) if args.yonerge else kilavuz.guide_text())
         return EXIT_OK
 
-    # Öncelik: --veri-klasoru, BULUTBELGE_DATA_DIR, masaüstü uygulamasının klasörü.
-    data = args.veri_klasoru or os.environ.get("BULUTBELGE_DATA_DIR") or str(default_data_dir())
+    agent_name = getattr(args, "ajan", None)
+    if agent_name and not _AGENT_NAME.fullmatch(agent_name):
+        stderr.write(
+            "Hata [invalid_params]: --ajan yalnızca harf, rakam, nokta, alt çizgi ve tire içerebilir "
+            "ve harf ya da rakamla başlamalıdır (ör. claude-code).\n"
+        )
+        return EXIT_USAGE
+
+    # Politika (ajan.json, settings.json, kasa, işlem günlüğü) masaüstü uygulamasının klasöründen
+    # okunur; çağıran (ajan) bu klasörü seçemez (karar: docs/kararlar/2026-11-21-ajan-cli-veri-klasoru.md).
+    # --veri-klasoru ve BULUTBELGE_DATA_DIR yalnızca açık geliştirme/test modunda kabul edilir.
+    if dev_mode():
+        data = args.veri_klasoru or os.environ.get("BULUTBELGE_DATA_DIR") or str(default_data_dir())
+    else:
+        if args.veri_klasoru:
+            stderr.write(
+                "Hata [invalid_params]: --veri-klasoru yalnızca geliştirme modunda kullanılabilir "
+                f"({DEV_ENV}=1). Ajan komutu masaüstü uygulamasının ayarlarını kullanır.\n"
+            )
+            return EXIT_USAGE
+        data = str(default_data_dir())
+        given = os.environ.get("BULUTBELGE_DATA_DIR")
+        if given and Path(given) != Path(data):
+            stderr.write(
+                f"Uyarı: BULUTBELGE_DATA_DIR yok sayıldı (yalnızca {DEV_ENV}=1 ile geçerli); "
+                "masaüstü uygulamasının ayarları kullanılıyor.\n"
+            )
     os.environ["BULUTBELGE_DATA_DIR"] = str(Path(data))
 
     from . import commands, journal, settings

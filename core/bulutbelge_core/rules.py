@@ -82,6 +82,9 @@ DATA_TYPES: dict[str, DataType] = {
         DataType("plaka", "Araç plakası", "[PLAKA]", (BLACKOUT, LABEL, PLATE_CITY, BLUR), BLACKOUT, example="34 ABC 123"),
         DataType("ip", "IP adresi", "[IP]", (LABEL, GENERALIZE, BLACKOUT, BLUR), LABEL,
                  method_labels=((GENERALIZE, "Alt ağ"),), example="10.20.30.45"),
+        DataType("gizli_anahtar", "Gizli anahtar / Token", "[GIZLI ANAHTAR]", (BLACKOUT, LABEL, BLUR), BLACKOUT,
+                 example="bb_ornek_anahtar_0000000000000000"),
+        DataType("barkod_qr", "QR kod ve barkod", "[BARKOD/QR]", (BLACKOUT, LABEL, BLUR), BLACKOUT),
         DataType("imei", "IMEI (cihaz no)", "[IMEI]", (BLACKOUT, LABEL, KEEP_LAST4, BLUR), BLACKOUT,
                  example="4901 5420 3237 518"),
         DataType("mac", "MAC adresi", "[MAC]", (LABEL, GENERALIZE, BLACKOUT, BLUR), LABEL,
@@ -92,6 +95,8 @@ DATA_TYPES: dict[str, DataType] = {
                  default_enabled=False, method_labels=((GENERALIZE, "Aralık"),), example="12.500,00 TL"),
         DataType("pasaport", "Pasaport no", "[PASAPORT]", (BLACKOUT, LABEL, KEEP_LAST4, PSEUDONYM, BLUR), BLACKOUT,
                  example="U12345678"),
+        DataType("mrz", "Kimlik / pasaport MRZ satırı", "[MRZ]", (BLACKOUT, LABEL, BLUR), BLACKOUT,
+                 example="P<TURYILMAZ<<AYSE<<<<<<<<<<<<<<<<<<<<<<<<"),
         DataType("ehliyet", "Sürücü belgesi no", "[EHLIYET]", (BLACKOUT, LABEL, KEEP_LAST4, BLUR), BLACKOUT,
                  example="123456"),
         DataType("gps", "GPS koordinatı", "[KONUM]", (BLACKOUT, LABEL, BLUR), BLACKOUT, example="41.0082, 28.9784"),
@@ -234,6 +239,8 @@ class Rules:
 
             self.date_shift_days = new_shift_days()
         return self.date_shift_days
+    # Tür bazında isteğe bağlı muafiyet/kural gerekçesi (ör. {"tc_kimlik": "KVKK Md.28"}).
+    reasons: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def default(cls) -> Rules:
@@ -299,6 +306,12 @@ class Rules:
         if data.get("signature_labels") is not None:
             rules.signature_labels = _clean_list(data.get("signature_labels"))
 
+        raw_reasons = data.get("reasons")
+        if isinstance(raw_reasons, dict):
+            for k, v in raw_reasons.items():
+                if k in DATA_TYPES and isinstance(v, str) and v.strip():
+                    rules.reasons[str(k)] = v.strip()[:40]
+
         for item in data.get("patterns") or []:
             name = str(item.get("name") or "Özel kalıp").strip()
             pattern = str(item.get("pattern") or "")
@@ -351,16 +364,21 @@ class Rules:
         return any(r.enabled and r.method == PSEUDONYM for r in self.types.values())
 
     def replacement_for(self, finding: Any, ascii_only: bool = True) -> str:
-        """Bulgunun yerine yazılacak metin (türün seçili yöntemiyle)."""
+        """Bulgunun yerine yazılacak metin (türün seçili yöntemiyle; etiket modunda varsa muafiyet kodu)."""
+        from .extra_types import ascii_tr
         from .mask import replacement  # döngüsel içe aktarmayı önlemek için burada
 
         source = getattr(finding, "source", "") or ""
         method = self.method_for(finding.type, source)
-        if finding.type == "ozel_kalip" and method == LABEL and source:
+        if method == LABEL and (finding.type == "ozel_kalip" and source or self.reasons.get(finding.type)):
             from .extra_types import ascii_tr
-
+        if finding.type == "ozel_kalip" and method == LABEL and source:
             etiket = f"[{source.upper()}]"
             return ascii_tr(etiket) if ascii_only else etiket
+        reason = self.reasons.get(finding.type)
+        if method == LABEL and reason:
+            tag = f"[{reason.strip('[] ')}]"
+            return ascii_tr(tag) if ascii_only else tag
         return replacement(finding, method, ascii_only, self.pseudonyms)
 
 

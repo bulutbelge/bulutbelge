@@ -1,5 +1,8 @@
-"""Motoru tek dosyalık çalıştırılabilir olarak paketler ve Tauri'nin
-beklediği yere (`src-tauri/binaries/bulutbelge-engine-<hedef-üçlü>[.exe]`) koyar.
+"""Motoru klasör (PyInstaller --onedir) olarak paketler ve Tauri'nin kaynak olarak
+alacağı yere (`src-tauri/binaries/engine/`) koyar.
+
+Tek dosya (--onefile) her açılışta ~140 MB'ı geçici klasöre açıyordu (ilk yanıt ~4,3 sn); klasör
+biçiminde ~0,1 sn (TAKIP 1.90, 17 Kasım 2026 ölçümü).
 
 Kullanım: engine/.venv içindeki Python ile `python build.py`
 """
@@ -34,7 +37,7 @@ def main() -> None:
     subprocess.run(
         [
             sys.executable, "-m", "PyInstaller",
-            "--onefile", "--noconfirm", "--clean",
+            "--onedir", "--noconfirm", "--clean",
             "--name", "bulutbelge-engine",
             "--distpath", str(work / "dist"),
             "--workpath", str(work / "work"),
@@ -57,9 +60,11 @@ def main() -> None:
     )
     ext = ".exe" if sys.platform == "win32" else ""
     BIN_DIR.mkdir(parents=True, exist_ok=True)
-    dest = BIN_DIR / f"bulutbelge-engine-{target_triple()}{ext}"
-    shutil.copy2(work / "dist" / f"bulutbelge-engine{ext}", dest)
-    print(f"Motor paketlendi: {dest}")
+    dest = BIN_DIR / "engine"
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(work / "dist" / "bulutbelge-engine", dest)
+    print(f"Motor paketlendi: {dest / ('bulutbelge-engine' + ext)}")
 
 
 if __name__ == "__main__":

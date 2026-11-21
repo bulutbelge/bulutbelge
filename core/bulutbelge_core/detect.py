@@ -50,15 +50,19 @@ _PHONE = re.compile(
 _CARD_GROUPED = re.compile(r"(?<![A-Za-z0-9])\d{4}([ -])\d{4}\1\d{4}\1\d{4}(?![A-Za-z0-9])")
 # "TC Kimlik No:" etiketinden sonra 11 hane olmayan sayı (eksik ya da fazla yazılmış).
 _DIGITS = re.compile(r"(?<!\d)\d{9,12}(?!\d)")
-_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# Geri bakış: eşleşme yalnızca yerel kısmın başında başlar. Yoksa "@" içermeyen uzun bir dizide her konumdan
+# yeniden denenir ve süre karesel büyür (900 KB tek satır metin işçiyi dakikalarca kilitliyordu, E.11 denemesi).
+_EMAIL = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 # Çakışmada öncelik (küçük olan kazanır).
 # IMEI kredi kartından önce: eşit uzunlukta Luhn geçerli 15 hanede IMEI kazanır (Amex find_imeis dışında kalır).
 _PRIORITY = {
     "ozel_ifade": 0,
     "ozel_kalip": 1,
-    "eposta": 2,
-    "iban": 3,
+    "gizli_anahtar": 2,
+    "mrz": 2,
+    "eposta": 3,
+    "iban": 4,
     "imei": 4,
     "kredi_karti": 5,
     "tc_kimlik": 6,
@@ -90,6 +94,7 @@ _PRIORITY = {
 
 # Ek türler: (tür, bulucu, güven)
 _EXTRA = (
+    ("gizli_anahtar", xt.find_secrets, HIGH),
     ("adres", xt.find_addresses, MEDIUM),
     ("dogum_tarihi", xt.find_birth_dates, HIGH),
     ("plaka", xt.find_plates, HIGH),
@@ -98,6 +103,7 @@ _EXTRA = (
     ("mac", xt.find_macs, MEDIUM),
     ("sase_no", xt.find_vins, HIGH),
     ("tutar", xt.find_amounts, HIGH),
+    ("mrz", ids.find_mrz, HIGH),
     ("pasaport", ids.find_passports, HIGH),
     ("ehliyet", ids.find_licences, HIGH),
     ("sgk", ids.find_sgk, HIGH),
@@ -167,7 +173,7 @@ def detect(
 
     # Karışık yazımlar (aralıklı/tam genişlikli rakam, OCR harfi, bölünmüş IBAN); doğrulayıcılı.
     for kind, start, end, confidence in find_mixed(
-        text, enabled("tc_kimlik"), enabled("iban"), enabled("telefon")
+        text, enabled("tc_kimlik"), enabled("iban"), enabled("telefon"), enabled("vkn"), enabled("kredi_karti")
     ):
         note = "karışık yazım" + (" (OCR benzeri harf)" if confidence == MEDIUM else "")
         candidates.append(Finding(kind, start, end, text[start:end], confidence, note))
@@ -240,11 +246,11 @@ def detect(
         return rules.allow is None or f.value not in rules.allow
 
     kept = _resolve_overlaps([f for f in candidates if wanted(f)])
-    extra = [
-        f
-        for f in _resolve_overlaps([f for f in uncertain if wanted(f)])
-        if all(f.end <= k.start or f.start >= k.end for k in kept)
-    ]
+    unsure = _resolve_overlaps([f for f in uncertain if wanted(f)])
+    occupied = _Occupancy(kept + unsure)
+    for k in kept:
+        occupied.add(k)
+    extra = [f for f in unsure if not occupied.overlaps(f)]
     return sorted(kept + extra, key=lambda f: f.start)
 
 
@@ -271,10 +277,80 @@ class PatternTimeout(Exception):
         self.name = name
 
 
+class _Coverage:
+    """0..n-1 birimleri: aralığı işaretle, aralıkta işaretli birim var mı (Fenwick ağacı + sonraki boş birim)."""
+
+    def __init__(self, n: int) -> None:
+        self._tree = [0] * (n + 1)
+        self._next = list(range(n + 1))  # i'den itibaren ilk işaretlenmemiş birim (yol sıkıştırmalı)
+
+    def _free(self, i: int) -> int:
+        root = i
+        while self._next[root] != root:
+            root = self._next[root]
+        while self._next[i] != root:
+            self._next[i], i = root, self._next[i]
+        return root
+
+    def _prefix(self, i: int) -> int:
+        total = 0
+        while i > 0:
+            total += self._tree[i]
+            i -= i & -i
+        return total
+
+    def any(self, lo: int, hi: int) -> bool:
+        return self._prefix(hi + 1) - self._prefix(lo) > 0
+
+    def mark(self, lo: int, hi: int) -> None:
+        i = self._free(lo)
+        while i <= hi:
+            j = i + 1
+            while j < len(self._tree):
+                self._tree[j] += 1
+                j += j & -j
+            self._next[i] = i + 1
+            i = self._free(i + 1)
+
+
+class _Occupancy:
+    """Tutulan bulgularla çakışma denetimi, bulgu başına O(log F) (güvenlik taraması F7).
+
+    Çakışma tanımı eskisiyle aynı: `not (f.end <= k.start or f.start >= k.end)`. Konumlar ikiye katlanır:
+    boş olmayan [s, e) aralığı 2s+1..2e-1 birimlerini, boş bulgu (s == e) 2s birimini kaplar. Böylece boş
+    bulgu yalnızca içine düştüğü aralıkla çakışır; iki boş bulgu (tanım gereği) birbiriyle çakışmaz.
+    """
+
+    def __init__(self, findings: list[Finding]) -> None:
+        coords = sorted({u for f in findings for u in self._units(f)})
+        self._index = {c: i for i, c in enumerate(coords)}
+        self._spans = _Coverage(len(coords))
+        self._points = _Coverage(len(coords))
+
+    @staticmethod
+    def _units(f: Finding) -> tuple[int, int]:
+        if f.end <= f.start:
+            return 2 * f.start, 2 * f.start
+        return 2 * f.start + 1, 2 * f.end - 1
+
+    def overlaps(self, f: Finding) -> bool:
+        a, b = self._units(f)
+        lo, hi = self._index[a], self._index[b]
+        if f.end <= f.start:
+            return self._spans.any(lo, hi)
+        return self._spans.any(lo, hi) or self._points.any(lo, hi)
+
+    def add(self, f: Finding) -> None:
+        a, b = self._units(f)
+        (self._points if f.end <= f.start else self._spans).mark(self._index[a], self._index[b])
+
+
 def _resolve_overlaps(findings: list[Finding]) -> list[Finding]:
     ordered = sorted(findings, key=lambda f: (-(f.end - f.start), _PRIORITY[f.type], f.start))
+    occupied = _Occupancy(ordered)
     kept: list[Finding] = []
     for f in ordered:
-        if all(f.end <= k.start or f.start >= k.end for k in kept):
+        if not occupied.overlaps(f):
+            occupied.add(f)
             kept.append(f)
     return sorted(kept, key=lambda f: f.start)

@@ -19,8 +19,10 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 
-# Etiket ile değer arası: "No", "Numarası", ":", "-", "#" ve boşluklar.
-_SEP = r"(?:\s*(?:no\.?|numaras[ıi]|nr\.?|#)?\s*[:#\-]?\s*)"
+# Etiket ile değer arası: "No", "Numarası", ":", "-", "#" ve boşluklar. Dil eski
+# `\s*(?:no...)?\s*[:#\-]?\s*` ile aynı; bitişik üç `\s*` boşluk dizisini kübik sayıda biçimde bölüyordu
+# (güvenlik taraması F4). Burada her boşluk dizisi tek bir niceleyiciye düşer.
+_SEP = r"(?:\s*(?:(?:no\.?|numaras[ıi]|nr\.?|#)\s*)?(?:[:#\-]\s*)?)"
 
 
 def _labeled(labels: str, value: str) -> re.Pattern[str]:
@@ -38,7 +40,7 @@ _MERSIS = _labeled(r"mers[iİı]s", r"0\d{3}[ \-]?\d{4}[ \-]?\d{4}[ \-]?\d{4}")
 _CUSTOMER = re.compile(
     r"(?i)(?<![\w])(?:müşteri|musteri|abone|abonelik|poliçe|police|sözleşme|sozlesme|hasta|protokol|dosya|"
     r"başvuru|basvuru|üye|uye|sipariş|siparis|kart\s+sahibi)"
-    r"\s*(?:no\.?|numaras[ıi]|nr\.?|#|kodu)\s*[:#\-]?\s*"
+    r"\s*(?:no\.?|numaras[ıi]|nr\.?|#|kodu)\s*(?:[:#\-]\s*)?"
     r"((?=[A-Z0-9\-]*\d)[A-Z0-9][A-Z0-9\-]{3,19})(?![\w])"
 )
 
@@ -68,3 +70,48 @@ def find_mersis(text: str) -> Iterator[tuple[int, int]]:
 
 def find_customer_numbers(text: str) -> Iterator[tuple[int, int]]:
     return _find(_CUSTOMER, text)
+
+
+# Kimlik / pasaport makinece okunabilir alan (MRZ): TD1 (3x30), TD2 (2x36), TD3 (2x44).
+# Satır satır ve doğrusal çalışır: iç içe niceleyicili tek bir düzenli ifade, rakamdan oluşan uzun bir satırda
+# karesel sürer (60 bin karakter 28 sn) ve sunucu işçisini kilitler (TAKIP E.11 ile aynı sorun).
+_MRZ_CHARS = re.compile(r"[A-Z0-9<]+")
+
+
+def _mrz_line_ok(line: str) -> bool:
+    n = len(line)
+    if n < 22 or n > 120 or not _MRZ_CHARS.fullmatch(line) or line.count("<") < 2:
+        return False
+    if line[0] in "IPACV" and n <= 47:  # TD1/TD2/TD3 satırı: tür harfi ("P<UTO..."), en çok 44 karakter, en az iki "<"
+        return True
+    if line[0] == "<" or line[1] == "<":
+        return False
+    i = line.find("<<", 2)
+    return i != -1 and n - (i + 2) >= 2
+
+
+def find_mrz(text: str) -> Iterator[tuple[int, int]]:
+    """Pasaport ve kimlik belgelerindeki alt MRZ (<<<) satır bloklarını bulur."""
+    lines: list[tuple[int, int]] = []
+    pos = 0
+    for line in text.split("\n"):
+        start = pos
+        pos += len(line) + 1
+        if len(line) > 200:
+            continue  # MRZ satırı en çok 44 karakterdir; uzun satırlar hiç taranmaz
+        val = line.strip(" \t")
+        if _mrz_line_ok(val):
+            s = start + (len(line) - len(line.lstrip(" \t")))
+            lines.append((s, s + len(val)))
+    if not lines:
+        return
+    # Ardışık MRZ satırlarını tek blok hâlinde birleştir (yalnız satır sonu / boşluk ayracı varsa).
+    cur_s, cur_e = lines[0]
+    for s, e in lines[1:]:
+        gap = text[cur_e:s]
+        if len(gap) <= 6 and not gap.strip():
+            cur_e = e
+        else:
+            yield cur_s, cur_e
+            cur_s, cur_e = s, e
+    yield cur_s, cur_e

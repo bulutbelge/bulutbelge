@@ -224,6 +224,18 @@ def test_agent_settings_validation(tmp_path):
     assert call("agent.get") == {"folders": [], "allow_write": False, "allow_without_terms": False, "profile": None}
 
 
+def test_agent_file_with_bom_is_read_and_broken_file_grants_nothing(tmp_path):
+    """Windows PowerShell 5.1 / Not Defteri BOM'lu UTF-8 yazar; izinler okunmalı. Bozuk dosya izin vermez."""
+    klasor = tmp_path / "izinli"
+    klasor.mkdir()
+    yol = settings.data_dir() / settings.AGENT_FILE
+    yol.write_bytes(b"\xef\xbb\xbf" + json.dumps({"folders": [str(klasor)], "allow_write": True}).encode("utf-8"))
+    ajan = call("agent.get")
+    assert ajan["folders"] == [str(klasor)] and ajan["allow_write"] is True
+    yol.write_bytes(b"\xff\xfe{bozuk")
+    assert call("agent.get")["folders"] == []
+
+
 def test_cli_uses_env_data_dir_when_no_flag(note):
     allow(note.parent)
     out, err = io.StringIO(), io.StringIO()
@@ -466,3 +478,22 @@ def test_pdf_password_too_short_rejected_and_non_pdf_refused(tmp_path, note):
     with pytest.raises(EngineError) as e:
         call("doc.mask", source=str(note), target=str(tmp_path / "n.txt"), password="sahte-parola-123")
     assert e.value.code
+
+
+@pytest.mark.parametrize("ad", ['=WEBSERVICE("http://ornek.invalid")', "-ajan", "ajan adı", "a;b", "@x", "ajan\n"])
+def test_cli_rejects_unsafe_agent_name(note, ad):
+    """Güvenlik taraması F15: --ajan yalnızca güvenli karakter kümesinden olur, günlüğe girmez."""
+    allow(note.parent)
+    before = len(log_lines()) if (settings.data_dir() / journal.LOG_FILE).exists() else 0
+    code, out, err = run_cli("read", str(note), f"--ajan={ad}")
+    assert code == cli.EXIT_USAGE and out == "" and "--ajan" in err
+    after = len(log_lines()) if (settings.data_dir() / journal.LOG_FILE).exists() else 0
+    assert after == before
+
+
+@pytest.mark.parametrize("ad", ["claude-code", "deneme", "Kod.Asistani_2", "ornek-ajan"])
+def test_cli_accepts_safe_agent_name(note, ad):
+    allow(note.parent)
+    code, _, err = run_cli("read", str(note), "--ajan", ad)
+    assert code == 0, err
+    assert log_lines()[-1]["agent"] == ad

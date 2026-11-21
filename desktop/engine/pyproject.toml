@@ -1,6 +1,7 @@
 [project]
 name = "bulutbelge-engine"
 version = "0.1.0"
+license = {text = "AGPL-3.0-only"}  # TAKIP 1.83; ayrıntı LICENSE, NOTICE.md
 description = "BulutBelge masaüstü uygulamasının Python motoru (Tauri yan süreci)"
 requires-python = ">=3.12"
 # Geliştirmede: pip install -e ../../core

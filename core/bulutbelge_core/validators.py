@@ -10,8 +10,11 @@ def digits_only(value: str) -> str:
 
 
 def tc_kimlik_valid(value: str) -> bool:
+    # Daha önce maskelenmiş değerler (ör. karartma blokları) rakam olmayabilir; hata vermeden reddedilir.
+    if len(value) != 11 or not (value.isascii() and value.isdigit()):
+        return False
     d = [int(c) for c in value]
-    if len(d) != 11 or d[0] == 0:
+    if d[0] == 0:
         return False
     d10 = ((d[0] + d[2] + d[4] + d[6] + d[8]) * 7 - (d[1] + d[3] + d[5] + d[7])) % 10
     d11 = sum(d[:10]) % 10
@@ -33,7 +36,7 @@ def vkn_valid(value: str) -> bool:
 
 def iban_valid(value: str) -> bool:
     iban = value.replace(" ", "").upper()
-    if len(iban) < 15 or not iban[:2].isalpha():
+    if len(iban) < 15 or not iban[:2].isalpha() or not (iban.isascii() and iban.isalnum()):
         return False
     rearranged = iban[4:] + iban[:4]
     numeric = "".join(str(int(ch, 36)) for ch in rearranged)

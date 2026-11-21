@@ -235,42 +235,18 @@ def test_watermark_optional(sample_pdf, tmp_path):
     assert TC not in text and IBAN not in text  # filigran maskelemeyi bozmaz
 
 
-def _black_width(path: Path, x0: float) -> int:
-    doc = pymupdf.open(path)
-    try:
-        pix = doc[0].get_pixmap(dpi=72)
-        row = 88  # TC satırının ortası
-        xs = [x for x in range(int(x0), pix.width) if sum(pix.pixel(x, row)[:3]) < 30]
-        return (max(xs) - min(xs) + 1) if xs else 0
-    finally:
-        doc.close()
-
-
-def test_fixed_box_width_does_not_depend_on_value_length(tmp_path):
-    widths = []
-    for i, value in enumerate([TC, TC + "9"]):
-        path = tmp_path / f"s{i}.pdf"
-        doc = pymupdf.open()
-        doc.new_page().insert_text((72, 92), f"TC kimlik: {value}", fontsize=11)
-        doc.save(path)
-        doc.close()
-        out = mask_pdf(path, tmp_path / f"c{i}.pdf", Rules.from_dict({"terms": [value]}), fixed_box=True)
-        assert value not in full_text(Path(out.target))
-        widths.append(_black_width(Path(out.target), 100))
-    assert widths[0] > 0 and widths[0] == widths[1]
-
-
-def test_gap_width_warning_only_for_variable_length_without_fixed_box(tmp_path):
+def test_gap_width_warning_for_variable_length(tmp_path):
     path = tmp_path / "g.pdf"
     doc = pymupdf.open()
     doc.new_page().insert_text((72, 92), "Proje: Mavi Kartal devam", fontsize=11)
     doc.save(path)
     doc.close()
     rules = Rules.from_dict({"terms": ["Mavi Kartal"]})
+    # Yer bazlı uyarı ("uzunluk anlaşılabilir") varsa genel uyarı ("uzunluğunu") tekrarlanmaz; biri mutlaka vardır.
+    uzunluk = lambda ws: any(("uzunluğunu" in w or "uzunluk anlaşılabilir" in w) for w in ws)  # noqa: E731
     plain = mask_pdf(path, tmp_path / "a.pdf", rules)
-    assert any("uzunluğunu" in w for w in plain.warnings)
-    fixed = mask_pdf(path, tmp_path / "b.pdf", rules, fixed_box=True)
-    assert not any("uzunluğunu" in w for w in fixed.warnings)
+    assert uzunluk(plain.warnings)
+    assert sum(("uzunluğunu" in w or "uzunluk anlaşılabilir" in w) for w in plain.warnings) == 1
 
 
 def test_gap_check_catches_glyph_left_inside_box(tmp_path):
@@ -422,6 +398,31 @@ def test_iban_wrapped_at_line_end_is_blacked_out(tmp_path):
     out = mask_pdf(src, tmp_path / "out.pdf", rules)
     text = full_text(Path(out[0] if isinstance(out, tuple) else out.target if hasattr(out, "target") else out))
     assert raw[14:] not in text.replace(" ", "").replace("\n", "") and raw[:14] not in text.replace(" ", "")
+
+
+def test_labeled_tc_and_phone_wrapped_at_line_end_are_blacked_out(tmp_path):
+    """1.62: etiketli TC ve telefon satır sonundan bölünse de bulunur ve iki parçası da silinir."""
+    tc = fake_tc("376543219")
+    src = tmp_path / "bolunmus_tc.pdf"
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 100), f"TC Kimlik No: {tc[:6]}", fontsize=11)
+    page.insert_text((72, 114), f"{tc[6:]} adına", fontsize=11)
+    page.insert_text((72, 160), "Tel: 0532 123", fontsize=11)
+    page.insert_text((72, 174), "45 67 arayın", fontsize=11)
+    page.insert_text((72, 220), "Siparis 0533 987", fontsize=11)
+    page.insert_text((72, 234), "65 43 adet", fontsize=11)
+    doc.save(src)
+    doc.close()
+    rules = Rules.from_dict(None)
+    scan = scan_pdf(src, rules)
+    tipler = sorted(f.finding.type for f in scan.findings)
+    assert tipler == ["tc_kimlik", "telefon"]  # etiketsiz bölünmüş sayı bulgu değil
+    assert all(len(f.rects) == 2 for f in scan.findings)
+    out = mask_pdf(src, tmp_path / "bolunmus_tc_m.pdf", rules)
+    metin = full_text(Path(out.target))
+    assert tc[:6] not in metin and tc[6:] not in metin
+    assert "Tel:" in metin and "Siparis 0533 987" in metin
 
 
 def test_open_action_javascript_is_removed(tmp_path):

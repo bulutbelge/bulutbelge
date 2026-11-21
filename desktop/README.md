@@ -83,7 +83,7 @@ cd engine && .venv/Scripts/python -m pytest
 npm run app:build
 ```
 
-Önce motoru PyInstaller ile tek dosya olarak paketler (`src-tauri/binaries/`, git'e girmez), sonra MSI ve NSIS kurulumlarını üretir. WebView2 çevrimdışı kurulum olarak pakete gömülür. Kullanıcının Python kurması gerekmez.
+Önce motoru PyInstaller ile klasör (`--onedir`) olarak paketler (`src-tauri/binaries/engine/`, git'e girmez; tek dosyaya göre motorun açılışı 4,3 sn yerine 0,1 sn), sonra MSI ve NSIS kurulumlarını üretir. WebView2 çevrimdışı kurulum olarak pakete gömülür. Kullanıcının Python kurması gerekmez.
 
 ## Dil desteği
 

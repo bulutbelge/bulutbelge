@@ -60,8 +60,11 @@ _ORG = "belediyesi|bakanlığı|müdürlüğü|başkanlığı|üniversitesi|hast
 _TITLE_ORG = re.compile(
     rf"{_B}(?:{_alt(_TITLES)}){_E}[ \t,]+(?:[{_L}']+[ \t]+){{0,4}}?(?:{_ORG})(?![{_L}0-9])"
 )
+# Aradaki sözcük harfle başlar: kesme işareti dizisi hem ayırıcıya hem sözcüğe bölünebildiği için
+# unvan gelmeyince ikinci dereceden geri izliyordu (güvenlik taraması F23/F24). "belediyesi'nin başkanı"
+# gibi ekli yazımlar aynı eşleşir.
 _ORG_TITLE = re.compile(
-    rf"{_B}(?:{_ORG})[ \t,']+(?:[{_L}']+[ \t]+){{0,2}}?(?:{_alt(_TITLES)}){_E}"
+    rf"{_B}(?:{_ORG})[ \t,']+(?:[{_L}][{_L}']*[ \t]+){{0,2}}?(?:{_alt(_TITLES)}){_E}"
 )
 _OCC = re.compile(rf"{_B}(?:{_alt(_OCCUPATIONS)}){_E}")
 _AGE = re.compile(rf"(?:\b\d{{1,3}}\s*yaşında|\byaş\s*:\s*\d{{1,3}}\b|\b\d{{1,3}}\s*yaş\b|\b\d{{2}}\+\s*yaş|\b\d{{1,2}}-\d{{1,2}}\s*yaş\b)")

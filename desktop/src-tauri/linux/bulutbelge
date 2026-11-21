@@ -1,0 +1,4 @@
+#!/bin/sh
+# BulutBelge komut satırı kısa adı (TAKIP D.8): .deb paketi /usr/bin/bulutbelge olarak kurar.
+# Motor uygulama kaynaklarıyla /usr/lib/BulutBelge/engine altına gelir (desktop/src-tauri/src/engine.rs ile aynı yol).
+exec /usr/lib/BulutBelge/engine/bulutbelge-engine "$@"

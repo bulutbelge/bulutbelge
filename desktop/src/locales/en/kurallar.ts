@@ -45,12 +45,10 @@ export default {
   "ör. Kişi-3": "e.g. Kişi-3",
   "Takma ad": "Pseudonym",
   "Her belgede farklı takma ad ver": "Use a different pseudonym in each document",
-  "Karartma kutusu sabit genişlikte olsun": "Use a fixed-width blackout box",
-  "PDF ve görselde kutunun genişliği maskelenen değerin uzunluğunu ele vermez; kutunun altındaki komşu metin de silinir.": "In PDF and images the box width does not reveal the length of the hidden value; neighbouring text under the box is also removed.",
   "Kapalıyken aynı kişi tüm belgelerde aynı takma adı alır; bu, belgelerin birbiriyle eşleştirilmesini kolaylaştırır. Takma ad anonimleştirme değildir.":
     "When off, the same person gets the same pseudonym in every document, which makes documents easier to link. A pseudonym is not anonymization.",
   "Gerçek değeri göster": "Show original value",
-  "Maskele": "Hide",
+  "Maskele": "Mask",
   "Tablo silinirse daha önce maskelenen belgelerdeki takma adlar bir daha geri çevrilemez ve yeni belgelerde numaralar baştan başlar.":
     "If the table is deleted, pseudonyms in documents masked earlier can no longer be reversed, and numbering starts over in new documents.",
   "Tabloyu sil": "Delete table",

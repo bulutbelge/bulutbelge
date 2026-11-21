@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useT } from "./i18n";
 import { Icon, IconName } from "./ui";
-
 /** "system": bilgisayarın ayarına uyar; "light"/"dark": kullanıcının seçimi. */
 export type Theme = "system" | "light" | "dark";
-
 const KEY = "bulutbelge.theme";
 const EVENT = "bulutbelge-theme";
 
@@ -58,11 +56,9 @@ export function useTheme(): [Theme, (t: Theme) => void, "light" | "dark"] {
     setThemeState(t);
     window.dispatchEvent(new Event(EVENT));
   }
-
   const resolved = theme === "system" ? (sysDark ? "dark" : "light") : theme;
   return [theme, setTheme, resolved];
 }
-
 /** Üst çubuktaki "Açık | Koyu" anahtarı. */
 export function ThemeSwitch() {
   const t = useT();

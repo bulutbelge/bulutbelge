@@ -193,7 +193,13 @@ def check(folder: Path, out_dir: Path) -> int:
         layers = _layers(out)
         image_values: set[str] = set()
         if is_image(out):
-            image_values = {_norm(f.finding.value) for f in scan_pdf(out, rules).findings}
+            yeniden = scan_pdf(out, rules)
+            image_values = {_norm(f.finding.value) for f in yeniden.findings}
+            if any("OCR dil dosyaları kurulu değil" in w for w in yeniden.warnings):
+                # OCR yoksa görselde yeniden okuma boş döner ve "temiz" görünürdü (yanlış güvence); sessiz geçilmez.
+                print("   KONTROL YAPILAMADI: OCR dil dosyaları kurulu değil (BULUTBELGE_TESSDATA); görsel sonucu geçerli sayılmaz")
+                leaks += 1
+                continue
         for value in spec["degerler"]:
             hits = [k for k, text in layers.items() if _norm(value) in _norm(text)]
             d = _digits(value)
@@ -213,7 +219,19 @@ def check(folder: Path, out_dir: Path) -> int:
     return 1 if leaks else 0
 
 
+def _tessdata_varsayilan() -> None:
+    """OCR dil dosyası ortam değişkeniyle verilmediyse depodaki masaüstü motoru klasörünü kullanır."""
+    import os
+
+    if os.environ.get("BULUTBELGE_TESSDATA"):
+        return
+    aday = Path(__file__).resolve().parents[2] / "desktop" / "engine" / "tessdata"
+    if (aday / "tur.traineddata").exists():
+        os.environ["BULUTBELGE_TESSDATA"] = str(aday)
+
+
 def main() -> None:
+    _tessdata_varsayilan()
     if len(sys.argv) not in (2, 3):
         print(__doc__)
         sys.exit(2)

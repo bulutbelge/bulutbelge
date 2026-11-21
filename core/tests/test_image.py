@@ -140,20 +140,3 @@ def test_gorselde_renkli_imza_etiketsiz_onerilir_ve_silinir(tmp_path):
     assert not [f for f in scan_pdf(src, kapali).findings if f.finding.type == "imza"]
     elle = mask_pdf(src, tmp_path / "elle.png", kapali, manual_areas=[(1, (0, 0, 300, 100))])
     assert Image.open(elle.target).getpixel((40, 30))[0] < 30
-
-
-@pytest.mark.skipif(not ocr_available(), reason="OCR dil dosyaları yok")
-def test_gorselde_sabit_kutu_degerden_genis_ve_komsu_metni_siler(tmp_path):
-    src = tmp_path / "kimlik.png"
-    _make_image(src, [f"TC: {TC}"])
-    kurallar = Rules.from_dict({"types": {"tc_kimlik": {"method": "karartma"}}})
-
-    def karanlik_genislik(yol: str) -> int:
-        img = Image.open(yol).convert("L")
-        satir = 75  # metin satırının ortası (144 dpi)
-        xs = [x for x in range(img.width) if img.getpixel((x, satir)) < 30]
-        return (max(xs) - min(xs) + 1) if xs else 0
-
-    normal = mask_pdf(src, tmp_path / "n.png", kurallar)
-    sabit = mask_pdf(src, tmp_path / "s.png", kurallar, fixed_box=True)
-    assert karanlik_genislik(sabit.target) > karanlik_genislik(normal.target) > 0

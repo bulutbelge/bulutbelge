@@ -124,9 +124,20 @@ fn engine_command() -> Result<Command, String> {
 
 #[cfg(not(debug_assertions))]
 fn engine_command() -> Result<Command, String> {
-    // Tauri, externalBin'i ana çalıştırılabilirin yanına hedef üçlüsü olmadan koyar.
+    // Motor klasör olarak (`engine/`) kaynaklarla gelir (TAKIP 1.90). Konum işletim sistemine göre değişir:
+    // Windows: uygulamanın yanında; macOS: Contents/Resources; Linux (.deb): /usr/lib/<ürün>.
     let exe = std::env::current_exe().map_err(|e| format!("uygulama yolu bulunamadı: {e}"))?;
     let dir = exe.parent().ok_or("uygulama dizini bulunamadı")?;
     let name = if cfg!(windows) { "bulutbelge-engine.exe" } else { "bulutbelge-engine" };
-    Ok(Command::new(dir.join(name)))
+    let adaylar = [
+        dir.join("engine").join(name),
+        dir.join("..").join("Resources").join("engine").join(name),
+        dir.join("..").join("lib").join("BulutBelge").join("engine").join(name),
+    ];
+    for aday in &adaylar {
+        if aday.is_file() {
+            return Ok(Command::new(aday));
+        }
+    }
+    Err(format!("motor bulunamadı: {}", adaylar[0].display()))
 }

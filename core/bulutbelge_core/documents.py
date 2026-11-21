@@ -2,7 +2,7 @@
 
 - "pdf":    PDF (metin katmanlı ya da taranmış)          → pdf.py
 - "gorsel": fotoğraf ve görseller (PNG, JPG, TIFF…)      → pdf.py + image.py
-- "metin":  XML, TXT, CSV                                → textdoc.py
+- "metin":  XML, CSV, TXT, LOG, MD, JSON, TSV, INI, YAML                              → textdoc.py
 - "word":   Word (.docx)                                 → word.py  (office.py)
 - "sunum":  PowerPoint (.pptx)                           → office.py
 - "tablo":  Excel (.xlsx)                                → office.py

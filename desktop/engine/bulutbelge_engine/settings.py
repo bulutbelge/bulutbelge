@@ -89,8 +89,6 @@ def _clean_profile(p: Any) -> dict[str, Any]:
     }
     if p.get("pseudonym_scope") == "belge":
         profile["pseudonym_scope"] = "belge"  # varsayılan (ortak) yazılmaz
-    if p.get("fixed_box") is True:
-        profile["fixed_box"] = True  # varsayılan (kapalı) yazılmaz; TAKIP 1.59
     if p.get("varsayilan_sutun_sozlugu") is False:
         profile["varsayilan_sutun_sozlugu"] = False  # varsayılan (açık) yazılmaz; TAKIP 1.105
     if p.get("column_rules"):
@@ -794,8 +792,10 @@ def load_agent() -> dict[str, Any]:
     out = _agent_defaults()
     if path.exists():
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+            # utf-8-sig: Windows PowerShell 5.1 / eski Not Defteri ile düzenlenen dosya BOM'la başlar; BOM yüzünden
+            # izinler sessizce "yok" sayılıyordu (1.55 paketli denemesi). Bozuk JSON yine izin vermez.
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             return out  # bozuk dosya: hiçbir izin yok (şüphede reddet)
         out["folders"] = [str(x) for x in data.get("folders") or [] if isinstance(x, str)][:MAX_AGENT_FOLDERS]
         out["allow_write"] = data.get("allow_write") is True

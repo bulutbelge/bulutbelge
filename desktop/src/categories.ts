@@ -15,14 +15,14 @@ export interface Category {
 
 export const CATEGORIES: Category[] = [
   { key: "isim", label: "İsimler", icon: "user", types: ["kisi_adi", "kurum_unvani"] },
-  { key: "kimlik", label: "Kimlik numaraları", icon: "idcard", types: ["tc_kimlik", "vkn", "vergi_dairesi", "pasaport", "ehliyet", "sgk", "mersis", "ticaret_sicil", "sicil_no"] },
+  { key: "kimlik", label: "Kimlik numaraları", icon: "idcard", types: ["tc_kimlik", "vkn", "vergi_dairesi", "pasaport", "ehliyet", "sgk", "mersis", "ticaret_sicil", "sicil_no", "mrz"] },
   { key: "iletisim", label: "Telefon ve e-posta", icon: "phone", types: ["telefon", "eposta"] },
   { key: "adres", label: "Adres", icon: "pin", types: ["adres"] },
   { key: "banka", label: "Banka ve kart", icon: "card", types: ["iban", "banka_bilgisi", "kredi_karti"] },
   { key: "tarih", label: "Doğum tarihi", icon: "calendar", types: ["dogum_tarihi"] },
-  { key: "gorsel", label: "İmza ve yüz", icon: "pen", types: ["imza", "yuz", "elle"] },
+  { key: "gorsel", label: "İmza ve yüz", icon: "pen", types: ["imza", "yuz", "barkod_qr", "elle"] },
   { key: "ozel", label: "Özel ifadeler", icon: "lock", types: ["ozel_ifade", "ozel_kalip"] },
-  { key: "diger", label: "Diğer bilgiler", icon: "tag", types: ["plaka", "ip", "imei", "mac", "sase_no", "gps", "kullanici_adi", "unvan_kurum", "tutar", "musteri_no", "ettn"] },
+  { key: "diger", label: "Diğer bilgiler", icon: "tag", types: ["plaka", "ip", "imei", "mac", "sase_no", "gps", "kullanici_adi", "unvan_kurum", "tutar", "musteri_no", "ettn", "gizli_anahtar"] },
 ];
 
 const BY_TYPE = new Map(CATEGORIES.flatMap((c) => c.types.map((ty) => [ty, c] as const)));
@@ -99,6 +99,9 @@ const SHORT: Record<string, string> = {
   tutar: "tutar",
   musteri_no: "müşteri no",
   ettn: "ETTN",
+  gizli_anahtar: "gizli anahtar",
+  barkod_qr: "QR kod / barkod",
+  mrz: "kimlik MRZ satırı",
   ozel_ifade: "özel ifade",
   ozel_kalip: "özel kalıp",
 };

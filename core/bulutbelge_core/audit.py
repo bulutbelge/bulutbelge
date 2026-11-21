@@ -13,6 +13,11 @@ ekleme bir kilit dosyasıyla sıraya konur.
 
 Sınır: dosyanın sonundan kayıt kesilirse zincir yine tutarlıdır. Bunu yakalamak
 için son özetin dışarıda (ör. düzenli dışa aktarılan CSV) saklanması gerekir.
+
+Saklama (TAKIP G.2, yalnızca sunucu çağırır): `prune` süresi dolan baştaki kayıtları
+bir bütün hâlinde siler ve günlüğün ilk satırına bir kontrol noktası yazar (son silinen
+kaydın özeti ve sırası). Kalan kayıtlar değişmez; `verify` zinciri kontrol noktasından
+sürdürür. Karar: docs/kararlar/2026-11-21-g2-gunluk-saklama-kontrol-noktasi.md.
 """
 
 from __future__ import annotations
@@ -27,7 +32,7 @@ import os
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -74,6 +79,12 @@ RESULTS = ("basarili", "hata", "reddedildi")
 
 _LOCK_TIMEOUT = 10.0
 
+# Kontrol noktası kaydının türü. Olay kayıtlarında "tur" alanı yoktur; ayırt edici budur.
+CHECKPOINT_KIND = "kontrol_noktasi"
+_CHECKPOINT_KEYS = frozenset(
+    {"v", "tur", "son_seq", "son_silinen_ozet", "silinen", "budama_sayisi", "budama_zamani", "esik", "saklama_gun", "hash"}
+)
+
 
 class AuditError(Exception):
     """Günlük okunamıyor ya da yazılamıyor: işlem yapılmamalı."""
@@ -82,10 +93,50 @@ class AuditError(Exception):
 @dataclass
 class VerifyResult:
     ok: bool
-    count: int
+    count: int  # doğrulanan olay kaydı sayısı (kontrol noktası sayılmaz)
     broken_at: int | None = None  # bozulan ilk kaydın satır sırası (1'den)
     reason: str = ""
     last_hash: str = GENESIS
+    checkpoint: dict[str, Any] | None = None  # günlük budanmışsa geçerli kontrol noktası
+
+
+@dataclass
+class PruneResult:
+    removed: int  # bu budamada silinen kayıt sayısı
+    remaining: int  # kalan olay kaydı sayısı
+    changed: bool  # dosya yeniden yazıldı mı
+    checkpoint: dict[str, Any] | None = None  # budama sonrası kontrol noktası (yoksa None)
+
+
+def is_checkpoint(record: Any) -> bool:
+    return isinstance(record, dict) and record.get("tur") == CHECKPOINT_KIND
+
+
+def _checkpoint_error(rec: dict[str, Any]) -> str | None:
+    """Kontrol noktası biçim ve özet denetimi; sorun yoksa None."""
+    if set(rec) != _CHECKPOINT_KEYS:
+        return "Kontrol noktası biçimi geçersiz"
+    son_seq, ozet, silinen = rec.get("son_seq"), rec.get("son_silinen_ozet"), rec.get("silinen")
+    if not (isinstance(son_seq, int) and not isinstance(son_seq, bool) and son_seq >= 1):
+        return "Kontrol noktası biçimi geçersiz"
+    if not (isinstance(silinen, int) and not isinstance(silinen, bool) and 1 <= silinen <= son_seq):
+        return "Kontrol noktası biçimi geçersiz"
+    if not (isinstance(ozet, str) and len(ozet) == 64 and ozet != GENESIS):
+        return "Kontrol noktası biçimi geçersiz"
+    if record_hash(rec) != rec.get("hash"):
+        return "Kontrol noktası sonradan değiştirilmiş"
+    return None
+
+
+def _parse_at(at: Any) -> datetime | None:
+    """Kayıt zamanı (ISO 8601); okunamazsa None. Saat dilimi yoksa yerel saat sayılır."""
+    if not isinstance(at, str) or not at:
+        return None
+    try:
+        dt = datetime.fromisoformat(at)
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.astimezone()
 
 
 def file_sha256(path: str | os.PathLike) -> str | None:
@@ -177,6 +228,22 @@ def _last_line(path: Path) -> bytes | None:
         return stripped or None
 
 
+def _fsync_dir(path: Path) -> None:
+    """`os.replace` sonrası dizin girdisini diske yazar (POSIX); Windows'ta desteklenmez, atlanır."""
+    if os.name == "nt":
+        return
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def _validate_cipher_key(cipher_key: bytes | None) -> bytes | None:
     if cipher_key is None:
         return None
@@ -231,6 +298,9 @@ class AuditLog:
             return 0, GENESIS
         try:
             rec = _open_record(line, self._cipher_key)
+            if is_checkpoint(rec):
+                # Bütün kayıtlar budanmış: zincir kontrol noktasından sürer.
+                return int(rec["son_seq"]), str(rec["son_silinen_ozet"])
             return int(rec["seq"]), str(rec["hash"])
         except AuditError:
             raise
@@ -331,8 +401,8 @@ class AuditLog:
         except OSError as exc:
             raise AuditError(f"Günlük yazılamıyor ({type(exc).__name__})") from None
 
-    def records(self) -> list[dict[str, Any]]:
-        """Bütün kayıtlar, eskiden yeniye. Okunamayan satır atlanmaz: hata verir."""
+    def _all_records(self) -> list[dict[str, Any]]:
+        """Kontrol noktası dahil bütün kayıtlar, dosyadaki sırayla."""
         if not self.path.exists():
             return []
         out = []
@@ -350,6 +420,18 @@ class AuditLog:
         except OSError as exc:
             raise AuditError(f"Günlük okunamıyor ({type(exc).__name__})") from None
         return out
+
+    def records(self) -> list[dict[str, Any]]:
+        """Bütün olay kayıtları, eskiden yeniye. Okunamayan satır atlanmaz: hata verir.
+
+        Kontrol noktası bir olay değildir, burada dönmez (panel, CSV ve süzgeçler değişmeden çalışır);
+        budama bilgisi için `checkpoint()`."""
+        return [r for r in self._all_records() if not is_checkpoint(r)]
+
+    def checkpoint(self) -> dict[str, Any] | None:
+        """Günlük budanmışsa ilk satırdaki kontrol noktası; değilse None."""
+        recs = self._all_records()
+        return recs[0] if recs and is_checkpoint(recs[0]) else None
 
     def migrate_to_encrypted(self) -> int:
         """Eski şifresiz (v1) satırları mevcut hash zincirini bozmadan v2 AES-GCM satırına çevirir."""
@@ -394,30 +476,126 @@ class AuditLog:
             raise AuditError(f"Günlük şifrelenemedi ({type(exc).__name__})") from None
 
     def verify(self) -> VerifyResult:
-        prev, count = GENESIS, 0
+        """Zinciri baştan doğrular. İlk satır kontrol noktasıysa zincir oradan sürer: ilk kaydın `prev`
+        değeri son silinen kaydın özeti, `seq` değeri son silinen sıranın bir fazlası olmalı."""
         if not self.path.exists():
             return VerifyResult(True, 0)
         with self.path.open("rb") as f:
-            for n, raw in enumerate(f, 1):
-                if not raw.strip():
-                    continue
-                count += 1
-                try:
+            return self._verify_lines(enumerate(f, 1))
+
+    def _verify_lines(self, lines: Any) -> VerifyResult:
+        prev, seq, count = GENESIS, 0, 0
+        checkpoint: dict[str, Any] | None = None
+        first = True
+        for n, raw in lines:
+            if not raw.strip():
+                continue
+            try:
+                rec = _open_record(raw, self._cipher_key)
+            except AuditError as exc:
+                return VerifyResult(False, count + 1, n, str(exc))
+            except ValueError:
+                return VerifyResult(False, count + 1, n, "Kayıt okunamıyor")
+            if is_checkpoint(rec):
+                if not first:
+                    return VerifyResult(False, count + 1, n, "Kontrol noktası yalnızca günlüğün ilk kaydı olabilir")
+                first = False
+                err = _checkpoint_error(rec)
+                if err:
+                    return VerifyResult(False, count + 1, n, err)
+                checkpoint = rec
+                prev, seq = rec["son_silinen_ozet"], rec["son_seq"]
+                continue
+            first = False
+            count += 1
+            seq += 1
+            if rec.get("prev") != prev:
+                return VerifyResult(False, count, n, "Zincir kopuk: önceki kayıt silinmiş ya da değiştirilmiş")
+            if rec.get("seq") != seq:
+                return VerifyResult(False, count, n, "Sıra numarası beklenmeyen")
+            if record_hash(rec) != rec.get("hash"):
+                return VerifyResult(False, count, n, "Kayıt sonradan değiştirilmiş")
+            prev = rec["hash"]
+        return VerifyResult(True, count, last_hash=prev, checkpoint=checkpoint)
+
+    def prune(
+        self,
+        days: int | None = None,
+        *,
+        older_than: datetime | None = None,
+        now: datetime | None = None,
+    ) -> PruneResult:
+        """Zamanı `older_than`'dan (ya da `now - days`) eski olan baştaki kayıtları bir bütün hâlinde siler.
+
+        Yalnızca baştan kesintisiz bir dilim silinir: zamanı eşikten yeni (ya da okunamayan) ilk kayıtta
+        durulur. Günlüğün ilk satırına kontrol noktası yazılır; önceki kontrol noktası varsa yenisiyle
+        değişir (sayaçlar toplanır). Kalan satırlar bayt bayt aynı kalır. Zincir doğrulanmıyorsa budama
+        yapılmaz (şüphede reddet: bozuk bölüm budamayla örtülmesin). Silinecek kayıt yoksa dosyaya
+        dokunulmaz. Yazma geçici dosyaya yapılır ve `os.replace` ile değiştirilir; yarıda kesilirse eski
+        günlük olduğu gibi kalır.
+        """
+        if (days is None) == (older_than is None):
+            raise ValueError("Budama için ya gün sayısı ya da eşik zamanı verilmeli")
+        now = now or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.astimezone()
+        if days is not None:
+            if isinstance(days, bool) or not isinstance(days, int) or days < 1:
+                raise ValueError("Saklama süresi en az 1 gün olmalı")
+            older_than = now - timedelta(days=days)
+        assert older_than is not None
+        if older_than.tzinfo is None:
+            older_than = older_than.astimezone()
+        if not self.path.exists():
+            return PruneResult(0, 0, False)
+        tmp = self.path.with_name(self.path.name + ".budama.tmp")
+        try:
+            with _locked(self.lock_path):
+                raw_lines = [ln for ln in self.path.read_bytes().splitlines(keepends=True) if ln.strip()]
+                v = self._verify_lines(enumerate(raw_lines, 1))
+                if not v.ok:
+                    raise AuditError(f"Günlük doğrulanamadı, budama yapılmadı: {v.reason}")
+                old_cp = v.checkpoint
+                body = raw_lines[1:] if old_cp else raw_lines
+                cut, last = 0, None
+                for raw in body:
                     rec = _open_record(raw, self._cipher_key)
-                except AuditError as exc:
-                    return VerifyResult(False, count, n, str(exc))
-                except ValueError:
-                    return VerifyResult(False, count, n, "Kayıt okunamıyor")
-                if not isinstance(rec, dict):
-                    return VerifyResult(False, count, n, "Kayıt okunamıyor")
-                if rec.get("prev") != prev:
-                    return VerifyResult(False, count, n, "Zincir kopuk: önceki kayıt silinmiş ya da değiştirilmiş")
-                if rec.get("seq") != count:
-                    return VerifyResult(False, count, n, "Sıra numarası beklenmeyen")
-                if record_hash(rec) != rec.get("hash"):
-                    return VerifyResult(False, count, n, "Kayıt sonradan değiştirilmiş")
-                prev = rec["hash"]
-        return VerifyResult(True, count, last_hash=prev)
+                    at = _parse_at(rec.get("at"))
+                    if at is None or at >= older_than:
+                        break
+                    cut, last = cut + 1, rec
+                if cut == 0 or last is None:
+                    return PruneResult(0, v.count, False, old_cp)
+                cp: dict[str, Any] = {
+                    "v": VERSION,
+                    "tur": CHECKPOINT_KIND,
+                    "son_seq": int(last["seq"]),
+                    "son_silinen_ozet": str(last["hash"]),
+                    "silinen": cut + (int(old_cp["silinen"]) if old_cp else 0),
+                    "budama_sayisi": 1 + (int(old_cp["budama_sayisi"]) if old_cp else 0),
+                    "budama_zamani": now.astimezone().isoformat(timespec="seconds"),
+                    "esik": older_than.astimezone().isoformat(timespec="seconds"),
+                    "saklama_gun": days,
+                }
+                cp["hash"] = record_hash(cp)
+                remaining = body[cut:]
+                try:
+                    with tmp.open("wb") as f:
+                        f.write(_seal_record(cp, self._cipher_key).encode("utf-8"))
+                        for raw in remaining:
+                            f.write(raw if raw.endswith(b"\n") else raw + b"\n")
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(tmp, self.path)
+                finally:
+                    # Yarıda kalan geçici dosya bırakılmaz (eski günlük zaten yerinde).
+                    tmp.unlink(missing_ok=True)
+                _fsync_dir(self.path.parent)
+                return PruneResult(cut, len(remaining), True, cp)
+        except AuditError:
+            raise
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise AuditError(f"Günlük budanamadı ({type(exc).__name__})") from None
 
 
 def _local_date(at: str) -> str:
@@ -458,8 +636,25 @@ def filter_records(
     return out
 
 
+# Elektronik tablonun formül olarak yorumlayacağı baş karakterler (CSV formül enjeksiyonu).
+_CSV_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_cell(v: Any) -> str:
+    """Metin hücresi formül karakteriyle başlıyorsa başına tek tırnak koyar; sayılar değişmez."""
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return "'" + v if v.startswith(_CSV_FORMULA_START) else v
+    return str(v)
+
+
 def to_csv(records: list[dict[str, Any]]) -> str:
-    """Excel'in Türkçe karakterleri doğru açması için BOM'lu UTF-8 ile yazılmalı (çağıran yazar)."""
+    """Excel'in Türkçe karakterleri doğru açması için BOM'lu UTF-8 ile yazılmalı (çağıran yazar).
+
+    Kayıttaki metinler (ajan adı, profil adı, yol, hata) çağırandan gelebilir; formül olarak
+    çalışmasınlar diye `=`, `+`, `-`, `@`, sekme ya da CR ile başlayan hücreler tek tırnakla yazılır.
+    """
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
     w.writerow(FIELDS)
@@ -469,6 +664,6 @@ def to_csv(records: list[dict[str, Any]]) -> str:
             v = r.get(k)
             if k == "counts":
                 v = ", ".join(f"{t}={n}" for t, n in (v or {}).items())
-            row.append("" if v is None else str(v))
+            row.append(_csv_cell(v))
         w.writerow(row)
     return buf.getvalue()

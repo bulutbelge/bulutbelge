@@ -21,11 +21,12 @@ import pymupdf
 
 from .detect import HIGH, MEDIUM, Finding, detect
 from .blur import blur_png
-from .image import ImageError, image_to_doc, is_image, metadata_warnings, save_page_as_image
+from .image import ImageError, image_to_doc, is_image, metadata_warnings, save_doc_as_image
 from .faces import face_remains, find_faces
 from .names import name_hints
+from .visual_pii import find_barcodes_qr, find_visual_mrz, find_visual_plates, find_visual_stamps
 from .ocr import SCAN_DPI, ocr_available, ocr_textpage
-from .rules import BLACKOUT, BLUR, Rules
+from .rules import BLACKOUT, BLUR, LABEL, Rules
 from .signatures import (
     _KALAN_ORAN,
     _fold,
@@ -67,6 +68,7 @@ class PdfFinding:
     preview: bytes | None = None  # imza önizlemesi (PNG), yalnızca bellekte
     image_digest: bytes | None = None
     image_xref: int = 0
+    reason: str = ""  # elle seçilen alanın gerekçesi ("[Ticari Sir]" etiketi olarak yazılır)
 
     @property
     def locatable(self) -> bool:
@@ -89,6 +91,67 @@ class MaskResult:
     warnings: list[str]
     dropped: int = 0  # kopyadan çıkarılan sayfa sayısı
     encrypted: bool = False  # kopya parolayla korundu
+    flattened: int = 0  # görüntüye düzleştirilen sayfa sayısı
+
+
+def parse_page_spec(spec: str | list[int] | tuple[int, ...] | None, page_count: int) -> list[int]:
+    """'1, 4-6, tek, cift, 2-15:tek' gibi sayfa aralığını veya tam sayı listesini sıralı 1'den sayfa numaralarına çevirir."""
+    if not spec:
+        return []
+    pages: set[int] = set()
+    if isinstance(spec, (list, tuple, set)):
+        for item in spec:
+            if isinstance(item, bool) or not isinstance(item, int):
+                raise PdfError("Sayfa numarası tam sayı olmalı")
+            if not 1 <= item <= page_count:
+                raise PdfError(f"Sayfa {item} belgede yok (toplam {page_count} sayfa)")
+            pages.add(item)
+        return sorted(pages)
+    if not isinstance(spec, str):
+        raise PdfError("Sayfa aralığı metin ya da sayı listesi olmalı")
+    for raw_part in spec.split(","):
+        part = raw_part.strip()
+        if not part:
+            continue
+        low = part.lower().translate(str.maketrans("çğıöşü", "cgiosu"))
+        if low in ("tumu", "hepsi", "all", "*"):
+            pages.update(range(1, page_count + 1))
+            continue
+        if low in ("tek", "odd"):
+            pages.update(p for p in range(1, page_count + 1) if p % 2 == 1)
+            continue
+        if low in ("cift", "even"):
+            pages.update(p for p in range(1, page_count + 1) if p % 2 == 0)
+            continue
+        parity: int | None = None
+        if ":" in low:
+            rng_part, mod = low.rsplit(":", 1)
+            mod = mod.strip()
+            if mod in ("tek", "odd"):
+                parity = 1
+            elif mod in ("cift", "even"):
+                parity = 0
+            else:
+                raise PdfError(f"Geçersiz sayfa filtresi: {part}")
+            part = rng_part.strip()
+        if "-" in part:
+            halves = [h.strip() for h in part.split("-")]
+            if len(halves) != 2 or not halves[0].isdigit() or not halves[1].isdigit():
+                raise PdfError(f"Geçersiz sayfa aralığı: {part}")
+            start, end = int(halves[0]), int(halves[1])
+            if start < 1 or end > page_count or start > end:
+                raise PdfError(f"Sayfa aralığı belge sınırları dışında: {part} (1–{page_count})")
+            for p in range(start, end + 1):
+                if parity is None or p % 2 == parity:
+                    pages.add(p)
+        else:
+            if not part.isdigit():
+                raise PdfError(f"Geçersiz sayfa numarası: {part}")
+            p = int(part)
+            if not 1 <= p <= page_count:
+                raise PdfError(f"Sayfa {p} belgede yok (toplam {page_count} sayfa)")
+            pages.add(p)
+    return sorted(pages)
 
 
 def _open(path: str | os.PathLike) -> pymupdf.Document:
@@ -135,15 +198,34 @@ def _flatten_doc(doc: pymupdf.Document) -> pymupdf.Document:
 
 
 def _page_text(
-    page: pymupdf.Page, textpage: pymupdf.TextPage | None = None
+    page: pymupdf.Page,
+    textpage: pymupdf.TextPage | None = None,
+    only_inside: list[pymupdf.Rect] | None = None,
+    skip_rects: list[pymupdf.Rect] | None = None,
 ) -> tuple[str, list[pymupdf.Rect | None]]:
-    """Sayfa metni ve her karakterin kutusu (satır/blok ayraçları için None)."""
+    """Sayfa metni ve her karakterin kutusu (satır/blok ayraçları için None).
+
+    `only_inside` ve `skip_rects`: karma (hem dijital metin hem gömülü tarama görseli içeren) sayfalarda
+    yalnız dijital metnin örtemediği görsel bölgelerdeki OCR bloklarını seçmek içindir.
+    """
     chars: list[str] = []
     boxes: list[pymupdf.Rect | None] = []
     raw = page.get_text("rawdict", flags=_TEXT_FLAGS, textpage=textpage)
     for block in raw["blocks"]:
         if block.get("type") != 0:
             continue
+        if only_inside is not None:
+            b_rect = pymupdf.Rect(block["bbox"])
+            if not any(
+                b_rect.intersects(ir) and (b_rect & ir).get_area() > 0.35 * max(b_rect.get_area(), 1.0)
+                for ir in only_inside
+            ):
+                continue
+            if skip_rects and any(
+                b_rect.intersects(sr) and (b_rect & sr).get_area() > 0.4 * max(b_rect.get_area(), 1.0)
+                for sr in skip_rects
+            ):
+                continue
         for line in block["lines"]:
             for span in line["spans"]:
                 for ch in span["chars"]:
@@ -156,6 +238,21 @@ def _page_text(
         chars.append("\n")
         boxes.append(None)
     return "".join(chars), boxes
+
+
+def _uncovered_image_rects(page: pymupdf.Page, vector_boxes: list[pymupdf.Rect | None]) -> list[pymupdf.Rect]:
+    """Metin katmanı olsa bile üzerinde yeterli vektör karakteri bulunmayan büyük görselleri bulur (karma PDF)."""
+    page_area = max(page.rect.get_area(), 1.0)
+    rects: list[pymupdf.Rect] = []
+    char_rects = [b for b in vector_boxes if b is not None]
+    for info in page.get_image_info():
+        bbox = pymupdf.Rect(info["bbox"]) & page.rect
+        if bbox.is_empty or bbox.get_area() < max(6000.0, 0.10 * page_area):
+            continue
+        covered_chars = sum(1 for cb in char_rects if bbox.intersects(cb))
+        if covered_chars < 12:
+            rects.append(bbox)
+    return rects
 
 
 def _span_rects(boxes: list[pymupdf.Rect | None], start: int, end: int) -> list[pymupdf.Rect]:
@@ -212,6 +309,80 @@ def _add_stamps(
         )
 
 
+# Vektör çizimle üretilmiş QR/barkod yüzlerce küçük çizim parçasıdır; bu aralık dışındaki sayfalar (düz metin, çok ağır çizim)
+# renderlanıp taranmaz (hız).
+_KOD_CIZIM_ARALIGI = (40, 6000)
+
+
+def _gorsel_bulgular(
+    findings: list[PdfFinding],
+    page: pymupdf.Page,
+    index: int,
+    rules: Rules,
+    previews: bool,
+    image: bool,
+    codes_on: bool,
+    plates_on: bool,
+    mrz_on: bool,
+    stamps_on: bool = False,
+) -> None:
+    """QR kod/barkod, fotoğraftaki plaka ve kimlik MRZ bölgesi: görüntüden (OpenCV) bulunur, OCR gerekmez.
+
+    Metin katmanından gelen aynı türdeki bulgularla çakışanlar `_gorsel_tekrarlarini_ele` ile elenir.
+    """
+    has_images = image or bool(page.get_images())
+
+    def ekle(tur: str, rect: pymupdf.Rect, aciklama: str, anahtar: str, sira: int) -> None:
+        f = Finding(tur, -1, -1, "", MEDIUM if tur != "barkod_qr" else HIGH, aciklama)
+        findings.append(
+            PdfFinding(
+                id=f"p{index + 1}:{anahtar}:{sira}",
+                page=index + 1,
+                finding=f,
+                rects=[rect],
+                replacement=rules.replacement_for(f),
+                kind="gorsel_kod",
+                preview=preview_png(page, rect) if previews else None,
+            )
+        )
+
+    if codes_on:
+        vektor = False
+        if not has_images:
+            n = len(page.get_cdrawings())
+            vektor = _KOD_CIZIM_ARALIGI[0] <= n <= _KOD_CIZIM_ARALIGI[1]
+        if has_images or vektor:
+            for i, (rect, desc) in enumerate(find_barcodes_qr(page)):
+                ekle("barkod_qr", rect, desc, "kod", i)
+    if plates_on:
+        for i, prect in enumerate(find_visual_plates(page)):
+            ekle("plaka", prect, "görsel plaka", "plaka:gorsel", i)
+    if mrz_on and has_images:
+        for k, (mrect, mdesc) in enumerate(find_visual_mrz(page)):
+            ekle("mrz", mrect, mdesc, "mrz:gorsel", k)
+    if stamps_on:
+        for j, (srect, sdesc) in enumerate(find_visual_stamps(page)):
+            ekle("imza", srect, sdesc, "imza:kase", j)
+
+
+def _gorsel_tekrarlarini_ele(findings: list[PdfFinding]) -> list[PdfFinding]:
+    """Görüntüden bulunan plaka/MRZ, metin katmanı ya da OCR'dan aynı yerde zaten bulunduysa tekrar sayılmaz."""
+    metinden = [f for f in findings if f.kind != "gorsel_kod" and f.finding.type in ("plaka", "mrz", "imza") and f.rects]
+    out = []
+    for f in findings:
+        if f.kind == "gorsel_kod" and f.finding.type in ("plaka", "mrz", "imza") and f.rects:
+            r = f.rects[0]
+            if any(
+                m.page == f.page
+                and m.finding.type == f.finding.type
+                and any(not (r & mr).is_empty and (r & mr).get_area() > 0.35 * min(r.get_area(), mr.get_area()) for mr in m.rects)
+                for m in metinden
+            ):
+                continue
+        out.append(f)
+    return out
+
+
 def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image: bool = False) -> ScanResult:
     findings: list[PdfFinding] = []
     warnings: list[str] = []
@@ -221,6 +392,10 @@ def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image
     # Görselde imza etiketi metin katmanında olmadığından imza otomatik aranmaz.
     signatures_on = rules.types["imza"].enabled and not image
     faces_on = rules.types["yuz"].enabled
+    codes_on = "barkod_qr" in rules.types and rules.types["barkod_qr"].enabled
+    plates_on = image and "plaka" in rules.types and rules.types["plaka"].enabled
+    mrz_on = "mrz" in rules.types and rules.types["mrz"].enabled
+    stamps_on = image and rules.types["imza"].enabled
     if has_digital_signature(doc):
         warnings.append(
             "Belgede elektronik imza var. Maskelenen kopyada e-imza kaldırılır; "
@@ -234,6 +409,22 @@ def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image
     )
     for index, page in enumerate(doc):
         text, boxes = _page_text(page)
+        if text.strip() and page.get_images():
+            # Karma PDF: metin katmanı var ama içinde vektör metin bulunmayan taranmış görsel blokları da var.
+            uncovered = _uncovered_image_rects(page, boxes)
+            if uncovered:
+                if not ocr_available():
+                    no_ocr_pages.append(index + 1)
+                else:
+                    vector_char_rects = [b for b in boxes if b is not None]
+                    ocr_text, ocr_boxes = _page_text(
+                        page, ocr_textpage(page, image), only_inside=uncovered, skip_rects=vector_char_rects
+                    )
+                    if ocr_text.strip():
+                        text = text + "\n\n" + ocr_text
+                        boxes = boxes + [None, None] + ocr_boxes
+                        ocr_pages.append(index + 1)
+        _gorsel_bulgular(findings, page, index, rules, previews, image, codes_on, plates_on, mrz_on, stamps_on)
         seen_xrefs: set[int] = set()
         if signatures_on:
             labeled = find_signatures(page, rules.signature_labels)
@@ -371,6 +562,7 @@ def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image
             f"{where} metin katmanı yok ve OCR dil dosyaları kurulu değil. "
             "Otomatik tespit yapılamadı; maskelenecek yerleri “Alan seç” ile işaretleyin."
         )
+    findings = _gorsel_tekrarlarini_ele(findings)
     return ScanResult(pages=doc.page_count, findings=findings, warnings=warnings, ocr_pages=ocr_pages)
 
 
@@ -413,25 +605,33 @@ def _swap_flat(doc: pymupdf.Document) -> pymupdf.Document:
     return flat
 
 
-def _manual_findings(
-    doc: pymupdf.Document, rules: Rules, areas: list[tuple[int, tuple[float, float, float, float]]]
-) -> list[PdfFinding]:
+def _manual_findings(doc: pymupdf.Document, rules: Rules, areas: list[tuple]) -> list[PdfFinding]:
+    """`areas`: (sayfa, (x0, y0, x1, y1)) ya da (sayfa, (x0, y0, x1, y1), gerekçe)."""
     out = []
-    for i, (page_no, coords) in enumerate(areas):
+    for i, area in enumerate(areas):
+        page_no, coords = area[0], area[1]
+        reason = (area[2] or "").strip()[:40] if len(area) > 2 else ""
         if not 1 <= page_no <= doc.page_count:
             raise PdfError(f"Elle seçilen alan geçersiz sayfada: {page_no}")
         rect = pymupdf.Rect(coords) & doc[page_no - 1].rect
         if rect.is_empty or rect.width < 2 or rect.height < 2:
             raise PdfError("Elle seçilen alan çok küçük ya da sayfanın dışında")
         f = Finding("elle", -1, -1, "", HIGH, "alan")
+        if reason:
+            from .extra_types import ascii_tr
+
+            replacement = ascii_tr("[" + reason.strip("[] ") + "]")
+        else:
+            replacement = rules.replacement_for(f)
         out.append(
             PdfFinding(
                 id=f"elle:{i}",
                 page=page_no,
                 finding=f,
                 rects=[rect],
-                replacement=rules.replacement_for(f),
+                replacement=replacement,
                 kind="alan",
+                reason=reason,
             )
         )
     return out
@@ -504,10 +704,6 @@ def _fit_font_size(text: str, size: float, width: float) -> float:
     return max(4.0, size)
 
 
-# Sabit kutu genişliği, satır yüksekliğinin katı olarak (değerden bağımsız); ~36 karakterlik IBAN'a yeter.
-_FIXED_BOX_HEIGHTS = 24.0
-
-
 _BOSLUK_ORANI = 0.6  # etiket, değerin kapladığı genişliğin en az bu kadarını doldurmalı
 
 
@@ -523,20 +719,14 @@ def _boslukluk_uyarilari(etiketli: int, kutulu: int) -> list[str]:
     if etiketli:
         out.append(
             f"{etiketli} yerde yerine konan etiket silinen değerden çok kısa; aradaki boşluk değerin uzunluğunu "
-            "gösterebilir. Karartma yöntemini ya da sabit genişlikli kutuyu düşünün."
+            "gösterebilir. Karartma yöntemini düşünün."
         )
     if kutulu:
         out.append(
             f"{kutulu} karartma kutusu değerin gerçek genişliğinde; uzunluk anlaşılabilir. "
-            "\"Sabit genişlikli kutu\" seçeneğini açın."
+            "Uzunluk önemliyse çıktıyı gözle kontrol edin."
         )
     return out
-
-
-def _fixed_rect(rect: pymupdf.Rect, page_rect: pymupdf.Rect) -> pymupdf.Rect:
-    """Kutuyu sabit genişliğe uzatır; sayfa kenarını aşarsa kırpılır, kutu asla değerden dar olmaz."""
-    width = max(rect.width, rect.height * _FIXED_BOX_HEIGHTS)
-    return pymupdf.Rect(rect.x0, rect.y0, min(rect.x0 + width, page_rect.x1), rect.y1)
 
 
 def mask_pdf(
@@ -550,8 +740,10 @@ def mask_pdf(
     password: str | None = None,
     counts: dict[str, int] | None = None,
     watermark: bool = False,
-    fixed_box: bool = False,
     flatten: bool = False,
+    mask_pages: str | list[int] | None = None,
+    exclude_pages: str | list[int] | None = None,
+    strip_bookmarks: bool = True,
 ) -> MaskResult:
     """Kaynağı tarar, dışlananlar dışındaki bulguları siler, sonucu hedefe yazar.
 
@@ -569,8 +761,9 @@ def mask_pdf(
     `counts`: verilirse maskelenen bulgular tür bazında sayılıp buraya yazılır (işlem günlüğü için).
     `watermark`: her sayfaya soluk, köşegen "MASKELİ KOPYA" yazısı eklenir (isteğe bağlı, TAKIP 1.30).
 
-    `fixed_box`: karartma kutuları değerin uzunluğundan bağımsız sabit genişlikte çizilir (TAKIP 1.59);
-    kutunun altında kalan komşu metin de silinir. PDF ve görselde; yalnızca metin bulgularında.
+    `mask_pages`: yalnız bu sayfalar maskelenir ("4-6", "1, 4-5, 7", "tek", "cift"; ya da sayı listesi); diğer
+    sayfalar olduğu gibi kalır. `exclude_pages`: bu sayfalar maskelenmez (önce `mask_pages` uygulanır).
+    `strip_bookmarks`: yer imleri (başlıklar kişisel veri taşıyabilir) kopyadan silinir; False ile korunur.
 
     `flatten`: yüksek riskli belge için; her sayfa görüntüye çevrilip yeniden OCR ile okunur ve
     maskelenir (TAKIP 1.63). Metin katmanı, gizli metin, açıklama ve ekler kopyaya hiç geçmez.
@@ -617,6 +810,11 @@ def mask_pdf(
             doc = _swap_flat(doc)
         scan = _scan_doc(doc, rules, image=image)
         scan.warnings = flatten_warnings + scan.warnings
+        n_pages = doc.page_count
+        if mask_pages or exclude_pages:
+            active = set(parse_page_spec(mask_pages, n_pages)) if mask_pages else set(range(1, n_pages + 1))
+            active -= set(parse_page_spec(exclude_pages, n_pages))
+            excluded_ids = excluded_ids | {f.id for f in scan.findings if f.page not in active}
         scan.findings.extend(_manual_findings(doc, rules, manual_areas or []))
         included = [f for f in scan.findings if f.id not in excluded_ids]
         unlocated = [f for f in included if not f.locatable]
@@ -654,12 +852,12 @@ def mask_pdf(
         for f in included:
             page = doc[f.page - 1]
             method = rules.method_for(f.finding.type, f.finding.source)
+            if f.reason:
+                method = LABEL  # gerekçeli elle alan: kutu yerine "[gerekçe]" etiketi
             blackout = method == BLACKOUT
             if method == BLUR:
                 blurs.extend((f.page - 1, r, f.kind) for r in f.rects)
             for i, rect in enumerate(f.rects):
-                if fixed_box and blackout and f.kind == "metin":
-                    rect = _fixed_rect(rect, page.rect)
                 if i == 0 and f.replacement and not blackout:
                     # Etiket redaction'a değil, silmeden sonra çevre yazının boyut ve taban çizgisiyle yazılır.
                     labels.append((f.page - 1, rect, f.replacement, *_label_metrics(page, rect, max_font)))
@@ -667,6 +865,10 @@ def mask_pdf(
                     tails.setdefault(f.page - 1, []).extend(_tail_words(page, rect))
                 if f.kind == "metin" and not (i == 0 and f.replacement and not blackout):
                     boxes.append((f.page - 1, rect))
+                if image and f.kind == "metin":
+                    # OCR sözcük kutusu harfin üst/alt ucunu tam kapsamayabilir (büyük harf ve noktalı harf izi kalırdı); biraz genişletilir.
+                    pay = max(1.0, rect.height * 0.15)
+                    rect = pymupdf.Rect(rect.x0, rect.y0 - pay, rect.x1, rect.y1 + pay)
                 page.add_redact_annot(rect, fill=(0, 0, 0) if blackout else (1, 1, 1), cross_out=False)
 
         for page in doc:
@@ -695,7 +897,7 @@ def mask_pdf(
                     for f in included
                     if f.kind == "metin" and rules.method_for(f.finding.type, f.finding.source) == BLACKOUT
                 )
-                if not (fixed_box or image)
+                if not image
                 else 0,
             )
         )
@@ -708,7 +910,8 @@ def mask_pdf(
         doc.scrub()
         _betikleri_temizle(doc)  # scrub katalogdaki OpenAction/AA betiklerini silmez (TAKIP 1.57)
         doc.set_metadata({})
-        doc.set_toc([])  # yer imi başlıkları kişisel veri taşıyabilir (TAKIP 1.57)
+        if strip_bookmarks:
+            doc.set_toc([])  # yer imi başlıkları kişisel veri taşıyabilir (TAKIP 1.57)
         if watermark:
             _add_watermark(doc)
 
@@ -716,7 +919,7 @@ def mask_pdf(
         os.close(tmp_fd)
         try:
             if image:
-                save_page_as_image(doc[0], Path(tmp_name))
+                save_doc_as_image(doc, Path(tmp_name))
             else:
                 doc.save(tmp_name, garbage=4, deflate=True, clean=True)
             _verify_no_leak(tmp_name, included, scan.findings, scan.ocr_pages, image)
@@ -726,7 +929,9 @@ def mask_pdf(
                         tmp_name, boxes, {_normalize(f.finding.value) for f in included if f.kind == "metin"}
                     )
                 )
-                scan.warnings.extend(_gap_width_warnings(included, fixed_box))
+                # Aynı konuyu söyleyen yer bazlı uyarı (etiket kısa / kutu tam genişlikte) zaten varsa genel uyarı tekrarlanmaz.
+                if not any(("yerde yerine konan etiket" in w or "karartma kutusu değerin" in w) for w in scan.warnings):
+                    scan.warnings.extend(_gap_width_warnings(included))
             scan.warnings.extend(_signature_leftover_warnings(tmp_name, sig_before))
             if drop:
                 _drop_pages(tmp_name, drop, included, scan.findings)
@@ -742,7 +947,12 @@ def mask_pdf(
     if counts is not None:
         count_types(counts, (f.finding.type for f in included))
     return MaskResult(
-        target=str(dst), masked=len(included), warnings=scan.warnings, dropped=len(drop), encrypted=bool(password)
+        target=str(dst),
+        masked=len(included),
+        warnings=scan.warnings,
+        dropped=len(drop),
+        encrypted=bool(password),
+        flattened=n_pages if flatten and not image else 0,
     )
 
 
@@ -986,6 +1196,11 @@ def _tail_words(page: pymupdf.Page, rect: pymupdf.Rect) -> list[_TailWord]:
             for span in line.get("spans", []):
                 word: list[dict] = []
                 for ch in [*span.get("chars", []), {"c": " ", "bbox": (0, 0, 0, 0)}]:
+                    # Değere bitişik noktalama ("(TC),"): kutunun içindeki karakterler sağdaki parçaya katılmaz,
+                    # yoksa parça kutunun içinden başlıyor sayılır ve kayınca geri konmazdı (yanlış "kayma" uyarısı).
+                    if ch["c"].strip() and (ch["bbox"][0] + ch["bbox"][2]) / 2 < rect.x1 - 0.5:
+                        word = []
+                        continue
                     if ch["c"].strip():
                         word.append(ch)
                         continue
@@ -1080,18 +1295,16 @@ def _verify_glyph_gaps(path: str, boxes: list[tuple[int, pymupdf.Rect]], values:
         )
     return [
         "Silinen kutunun içine komşu metinden glifler kaydı (silme sonrası metin kayması). "
-        "Kutu çevresindeki yazıyı gözle kontrol edin; sabit genişlikli kutu bunu önler."
+        "Kutu çevresindeki yazıyı gözle kontrol edin."
     ]
 
 
-def _gap_width_warnings(included: list[PdfFinding], fixed_box: bool) -> list[str]:
+def _gap_width_warnings(included: list[PdfFinding]) -> list[str]:
     """Kutu ve boşluk genişliği, sonraki metnin kayması değerin uzunluğunu ele verebilir (TAKIP 1.58).
 
     Değerin yerine kutu konduğunda sonraki metin yerinde kalır; kutu/boşluk genişliği değer
-    uzunluğuyla orantılıdır. Uzunluğu değişken türlerde sabit kutu kullanılmadıysa uyarı verilir.
+    uzunluğuyla orantılıdır. Uzunluğu değişken türlerde uyarı verilir.
     """
-    if fixed_box:
-        return []
     pages = sorted(
         {
             f.page
@@ -1103,7 +1316,7 @@ def _gap_width_warnings(included: list[PdfFinding], fixed_box: bool) -> list[str
         return []
     return [
         f"Sayfa {', '.join(map(str, pages))}: kutu ve boşluk genişliği maskelenen değerin uzunluğunu "
-        "ele verebilir. Uzunluk önemliyse sabit genişlikli kutu seçeneğini kullanın."
+        "ele verebilir. Uzunluk önemliyse çıktıyı gözle kontrol edin."
     ]
 
 
@@ -1150,8 +1363,11 @@ def _verify_no_leak(
         for f in areas:
             # Kenardaki harf parçaları sayılmasın diye alan biraz daraltılır.
             inner = f.rects[0] + (1, 1, -1, -1)
-            if not inner.is_empty and out[f.page - 1].get_textbox(inner).strip():
-                leaked += 1
+            if not inner.is_empty:
+                kalan = out[f.page - 1].get_textbox(inner).strip()
+                # Gerekçeli alanda yerine yazılan "[gerekçe]" etiketi kalması beklenir; başka yazı kaçaktır.
+                if kalan and not (f.reason and _normalize(kalan) in _normalize(f.replacement)):
+                    leaked += 1
         for f in faces:
             # Yüz bölgesi silindiyse kaydedilen sayfada orada yüz bulunmamalı.
             if face_remains(out[f.page - 1], f.rects[0]):

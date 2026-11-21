@@ -24,6 +24,7 @@ from .extra_types import address_province, find_addresses, find_amounts
 from .rules import Rules
 from .signatures import SignatureRegion
 from .validators import digits_only, iban_valid, tc_kimlik_valid, vkn_valid
+from .xmltok import iter_tokens
 
 # ---------- Ortak e-Fatura yardımcıları ----------
 
@@ -440,11 +441,14 @@ def find_efatura_visuals(page: pymupdf.Page, rules: Rules, page_text: str) -> li
 
 # ---------- UBL-TR XML Anlamsal Tarama ----------
 
+# Öznitelik: boşluklardan sonra boşluk olmayan bir karakterle başlar; böylece boşluk dizisi tek biçimde
+# bölünür (eski `\s+[^<>"']*` kapanmayan etikette üstel geri izliyordu, güvenlik taraması F1/F2).
+# Yorum, CDATA ve işleme talimatı `xmltok.iter_tokens` ile doğrusal taranır.
 _TOKEN = re.compile(
     r"<!--(?P<comment>.*?)-->"
     r"|<!\[CDATA\[(?P<cdata>.*?)\]\]>"
     r"|<\?.*?\?>"
-    r"|(?P<tag><(?P<close>/)?(?P<name>[A-Za-z_][A-Za-z0-9_.:-]*)(?P<attrs>(?:\s+[^<>\"']*(?:\"[^\"]*\"|'[^']*'))*)\s*(?P<self>/)?>)",
+    r"|(?P<tag><(?P<close>/)?(?P<name>[A-Za-z_][A-Za-z0-9_.:-]*)(?P<attrs>(?:\s+[^<>\"'\s][^<>\"']*(?:\"[^\"]*\"|'[^']*'))*)\s*(?P<self>/)?>)",
     re.DOTALL,
 )
 _ATTR = re.compile(r"([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:\"(?P<dq>[^\"]*)\"|'(?P<sq>[^']*)')")
@@ -610,7 +614,7 @@ def scan_ubl_xml(text: str, rules: Rules, hints: frozenset[str], lead: bool) -> 
     free_findings: list[Finding] = []
     semantic: list[Finding] = []
 
-    for m in _TOKEN.finditer(text):
+    for m in iter_tokens(_TOKEN, text):
         if m.start() > pos and stack:
             seg = text[pos:m.start()]
             if seg.strip():

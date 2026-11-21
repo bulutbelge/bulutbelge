@@ -61,7 +61,7 @@ export function BatchMain({ plan, rules, onRunningChange }: { plan: BatchPlan | 
         <div className="ready-doc">
           <Icon name="folder" size={36} />
           <b>{t("Klasör seçin")}</b>
-          <span>{t("Klasördeki tüm belgeler (PDF, Word, Excel, PowerPoint, görsel, XML, TXT, CSV) aynı profille maskelenir; klasör yapısı hedefte korunur.")}</span>
+          <span>{t("Klasördeki tüm belgeler (PDF, Word, Excel, PowerPoint, görsel, XML, CSV, JSON, TXT, LOG) aynı profille maskelenir; klasör yapısı hedefte korunur.")}</span>
         </div>
       </div>
     );
