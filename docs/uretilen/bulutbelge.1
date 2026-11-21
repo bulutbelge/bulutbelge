@@ -1,0 +1,177 @@
+'\" Bu dosya üretilir, elle düzenlemeyin: `python core/tools/belge_uret.py`
+.TH BULUTBELGE 1 "" "BulutBelge" "Kullanıcı Komutları"
+.SH AD
+bulutbelge \- izinli klasörlerde maskeli okuma ve maskeli kopya yazma
+.SH ÖZET
+.nf
+bulutbelge read [\-h] [\-\-profil PROFIL] [\-\-ajan AJAN] [\-\-json] dosya
+bulutbelge mask [\-h] [\-\-profil PROFIL] [\-\-ajan AJAN] [\-\-json] [\-\-hedef HEDEF] dosya
+bulutbelge folders [\-h] [\-\-json]
+bulutbelge kilavuz [\-h] [\-\-yonerge]
+.fi
+.SH AÇIKLAMA
+.PP
+BulutBelge ajan komutu: izinli klasörlerde maskeli okuma ve maskeli kopya yazma.
+.SH KOMUTLAR
+.TP
+.B read
+Belgenin maskeli metnini yazdırır
+.RS
+.TP
+.B \-\-profil
+Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen)
+.RE
+.RS
+.TP
+.B \-\-ajan
+Ajanın adı (günlüğe yazılır), ör. claude\-code
+.RE
+.RS
+.TP
+.B \-\-json
+Çıktıyı JSON olarak ver
+.RE
+.TP
+.B mask
+Maskeli kopyayı yeni dosyaya yazar
+.RS
+.TP
+.B \-\-profil
+Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen)
+.RE
+.RS
+.TP
+.B \-\-ajan
+Ajanın adı (günlüğe yazılır), ör. claude\-code
+.RE
+.RS
+.TP
+.B \-\-json
+Çıktıyı JSON olarak ver
+.RE
+.RS
+.TP
+.B \-\-hedef
+Maskeli kopyanın yolu (varsayılan: kaynağın yanında _maskeli)
+.RE
+.TP
+.B folders
+İzinli klasörleri ve yazma iznini gösterir
+.RS
+.TP
+.B \-\-json
+
+.RE
+.TP
+.B kilavuz
+Ajan kılavuzunu yazdırır (kurulum, komutlar, çıkış kodları, hazır yönerge)
+.RS
+.TP
+.B \-\-yonerge
+Yalnızca ajanın talimat dosyasına eklenecek hazır yönergeyi yazdır
+.RE
+.SH ÇIKIŞ KODLARI
+.TP
+.B 0
+Başarılı. Ajan: Devam et.
+.TP
+.B 1
+Belge ya da işlem hatası (bozuk dosya, desteklenmeyen biçim, kaçak denetimi). Ajan: Hata mesajını kullanıcıya ilet; dosyayı başka yoldan okuma.
+.TP
+.B 2
+Kullanım hatası (yanlış argüman, kural takımı yok). Ajan: Komutu düzelt.
+.TP
+.B 3
+İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu. Ajan: Dur, mesajı aynen ilet; izni aşmaya çalışma.
+.TP
+.B 4
+İşlem günlüğü yazılamıyor; güvenlik için işlem yapılmadı. Ajan: Dur, kullanıcıya bildir.
+.SH JSON ÇIKTISI
+.PP
+\-\-json başarıda stdout'a tek satır JSON yazar.
+.SS read \-\-json
+.TP
+.B ok
+boolean. Başarıda her zaman true
+.TP
+.B text
+string. Belgenin maskeli metni
+.TP
+.B summary
+object. İşlem özeti (alanlar aşağıda)
+.SS mask \-\-json
+.TP
+.B ok
+boolean. Başarıda her zaman true
+.TP
+.B summary
+object. İşlem özeti (alanlar aşağıda)
+.SS folders \-\-json
+.TP
+.B folders
+array of string. İzinli klasörler
+.TP
+.B allow_write
+boolean. Maskeli kopya yazma izni
+.SS summary
+.TP
+.B islem
+string. "okuma" ya da "maskeleme"
+.TP
+.B kaynak
+string. Kaynak belgenin mutlak yolu
+.TP
+.B hedef
+string | null. Maskeli kopyanın yolu (yalnızca mask; read'de null)
+.TP
+.B kural_takimi
+string. Kullanılan kural takımının adı
+.TP
+.B maskelenen
+integer. Maskelenen değer sayısı
+.TP
+.B turler
+object (string → integer). Veri türü adına göre maskelenen sayı
+.TP
+.B uyarilar
+array of string. Uyarılar (ör. OCR); yoksa boş liste
+.TP
+.B not
+string | null. İşlem notu; yoksa null
+.SH ÖRNEKLER
+.nf
+bulutbelge folders
+bulutbelge read "C:\eBelgeler\eornek_basvuru.pdf" \-\-ajan claude\-code
+bulutbelge mask "C:\eBelgeler\eornek_basvuru.pdf" \-\-ajan claude\-code \-\-json
+.fi
+.SH GÜVENLİK MODELİ
+.PP
+BulutBelge'nin kodda zorladığı kurallar (ajan aşamaz):
+.IP \(bu 2
+Amaç olmadan erişim yok: izinli klasör dışındaki dosya okunmaz, yazılmaz. Yol kaçışları (..) reddedilir.
+.IP \(bu 2
+Yazma ayrı bir izindir ve her zaman yeni dosyaya yapılır.
+.IP \(bu 2
+Maske kaldırma (takma adı gerçek değere çevirme) ve kasa açma komut satırında yoktur.
+.IP \(bu 2
+Çıktıda orijinal değer yoktur; işlem günlüğünde belge içeriği yoktur, yalnızca yol ve tür bazında sayılar.
+.IP \(bu 2
+Günlük yazılamazsa işlem yapılmaz.
+.PP
+Zorlanmayan (ajanın kendi disiplini): ajan, izinli klasördeki dosyaları kabuktan doğrudan da okuyabilir; BulutBelge bunu engelleyemez. Engel, ajan aracının kendi izin ayarlarıdır (örn. Claude Code'da o klasörlere doğrudan okuma izni vermemek, yalnızca bulutbelge komutunu izinli saymak). Hazır yönerge bunu ajana söyler.
+.PP
+Maskeleme %100 doğru değildir: bir bilgiyi kaçırabilir ya da gerekenden fazlasını maskeleyebilir. Önemli belgelerde çıktıyı paylaşmadan önce kontrol edin (ayrıntı: Kullanım Koşulları).
+.SH SINIRLAR
+.IP \(bu 2
+Ajan aracı izinli klasördeki dosyalara kabuktan doğrudan erişebiliyorsa BulutBelge bunu engellemez (yukarıda "Zorlanmayan").
+.IP \(bu 2
+İşlem günlüğü dosya yollarını tutar; dosya adında kişi adı varsa günlükte de görünür.
+.IP \(bu 2
+Başarılı mask işlemi arayüzdeki "Son yapılanlar" listesine "Ajan (ad)" etiketiyle de eklenir; read ve reddedilen çağrılar yalnızca işlem günlüğüne girer.
+.IP \(bu 2
+Taranmış sayfa ve fotoğrafın metin katmanı yoktur: OCR kuruluysa okunur ve maskelenir (OCR hata yapabilir); kurulu değilse read çıktısında içerikleri yer almaz, özette uyarı olarak geçer ve o sayfadaki veri maskelenmemiş olabilir.
+.IP \(bu 2
+Maske kaldırma ve kasa açma komut satırında yoktur.
+.SH ŞUNA DA BAKIN
+.PP
+bulutbelge kilavuz, docs/AJAN\-KOMUT\-SATIRI.md
