@@ -66,3 +66,27 @@ def test_wix_turkce_yerellestirme_dosyasi_var_ve_launchapp_tanimli():
     metin = yol.read_text(encoding="utf-8")
     assert 'Culture="tr-TR"' in metin
     assert re.search(r'<String Id="LaunchApp">[^<]+</String>', metin)
+
+
+def test_paketler_lisans_metinlerini_ve_aciklamayi_tasir():
+    """Lisans (AGPL/LGPL) metinleri ve atıflar yazılımla birlikte gider; .deb açıklaması ve kategorisi dolu."""
+    conf = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))
+    bundle = conf["bundle"]
+    assert bundle.get("shortDescription") and bundle.get("longDescription")
+    assert bundle.get("category") == "Utility"
+    assert bundle["copyright"].startswith("Copyright (c) 2026 PROTEK")
+    # Debian belge klasörü: LICENSE copyright adıyla, NOTICE ve üçüncü taraf listesi yanında.
+    deb = bundle["linux"]["deb"]["files"]
+    for hedef, ad in (
+        ("/usr/share/doc/bulutbelge/copyright", "LICENSE"),
+        ("/usr/share/doc/bulutbelge/NOTICE.md", "NOTICE.md"),
+        ("/usr/share/doc/bulutbelge/THIRD-PARTY-LICENSES.md", "THIRD-PARTY-LICENSES.md"),
+    ):
+        assert (TAURI / deb[hedef]).resolve() == (ENGINE.parent.parent / ad).resolve()
+        assert (TAURI / deb[hedef]).is_file()
+    # Her işletim sistemi için: sürüm yapılandırması lisans dosyalarını licenses/ altına koyar.
+    kaynaklar = json.loads((TAURI / "tauri.release.conf.json").read_text(encoding="utf-8"))["bundle"]["resources"]
+    for ad in ("LICENSE", "NOTICE.md", "THIRD-PARTY-LICENSES.md"):
+        assert kaynaklar[f"../../{ad}"] == f"licenses/{ad}"
+        assert (TAURI / f"../../{ad}").resolve().is_file()
+    assert kaynaklar["binaries/engine/"] == "engine/"

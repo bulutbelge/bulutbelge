@@ -29,6 +29,10 @@
     "targets": ["msi", "nsis"],
     "license": "AGPL-3.0-only",
     "licenseFile": "windows/KOSULLAR.rtf",
+    "copyright": "Copyright (c) 2026 PROTEK YAZILIM SİSTEM DANIŞMANLIK BİLG. SAN. VE TİC. LTD. ŞTİ.",
+    "category": "Utility",
+    "shortDescription": "Belgelerdeki kişisel verileri bilgisayarınızda maskeler",
+    "longDescription": "BulutBelge, PDF, Word, Excel, PowerPoint, görsel ve metin belgelerindeki kişisel verileri bulup bilgisayarınızda gerçekten silerek maskeler. Belgeler bilgisayardan çıkmaz. Yardımcı bir araçtır; çıktıyı paylaşmadan önce gözden geçirin.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,7 +44,10 @@
       "deb": {
         "files": {
           "/usr/share/man/man1/bulutbelge.1": "../../docs/uretilen/bulutbelge.1",
-          "/usr/bin/bulutbelge": "linux/bulutbelge"
+          "/usr/bin/bulutbelge": "linux/bulutbelge",
+          "/usr/share/doc/bulutbelge/copyright": "../../LICENSE",
+          "/usr/share/doc/bulutbelge/NOTICE.md": "../../NOTICE.md",
+          "/usr/share/doc/bulutbelge/THIRD-PARTY-LICENSES.md": "../../THIRD-PARTY-LICENSES.md"
         }
       }
     },
