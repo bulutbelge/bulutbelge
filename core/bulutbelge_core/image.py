@@ -118,6 +118,151 @@ def metadata_warnings(path: str | Path) -> list[str]:
     return [f"Görselin meta verisinde {', '.join(found)} var. Kaydedilen dosyada tüm meta veri silinir."]
 
 
+# ---------- Yeniden kodlamadan meta veri silme (Office içindeki bulgusuz görseller) ----------
+
+# JPEG: kalan işaretler (APP0 JFIF, APP14 Adobe renk dönüşümü, APP2 yalnızca ICC renk profili); diğer APPn
+# (EXIF, XMP, IPTC, MPF ek görselleri) ve COM silinir. EOI'den sonrası (ek görsel, gizli veri) atılır.
+_JPEG_KEEP_APP = {0xE0: b"JFIF\x00", 0xEE: b"Adobe", 0xE2: b"ICC_PROFILE\x00"}
+# PNG: görüntü için gereken ve renk/oran yardımcı parçaları; metin (tEXt/zTXt/iTXt), eXIf, tIME ve bilinmeyen
+# yardımcı parçalar silinir. Bilinmeyen zorunlu parça (büyük harfle başlar) kalır, yoksa dosya bozulur.
+_PNG_KEEP = {b"PLTE", b"tRNS", b"cHRM", b"gAMA", b"iCCP", b"sBIT", b"sRGB", b"bKGD", b"pHYs", b"hIST",
+             b"acTL", b"fcTL", b"fdAT", b"cICP"}
+
+
+def _jpeg_orientation_app1(data: bytes) -> bytes:
+    """Özgün EXIF'teki yön bilgisi (yalnızca o) korunur: silinirse görsel yan dönmüş görünebilir."""
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            orientation = im.getexif().get(ExifTags.Base.Orientation)
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        return b""
+    if not isinstance(orientation, int) or orientation in (0, 1):
+        return b""
+    exif = Image.Exif()
+    exif[ExifTags.Base.Orientation] = orientation
+    body = exif.tobytes()
+    return b"\xff\xe1" + (len(body) + 2).to_bytes(2, "big") + body
+
+
+def _strip_jpeg(data: bytes) -> bytes:
+    if data[:2] != b"\xff\xd8":
+        raise ImageError("JPEG değil")
+    out = bytearray(b"\xff\xd8")
+    out += _jpeg_orientation_app1(data)
+    i, n = 2, len(data)
+    while i < n:
+        if data[i] != 0xFF:
+            raise ImageError("JPEG bozuk")
+        while i < n and data[i] == 0xFF:
+            i += 1  # dolgu
+        if i >= n:
+            raise ImageError("JPEG bozuk")
+        marker = data[i]
+        i += 1
+        if marker == 0xD9:  # EOI: sonrası atılır
+            out += b"\xff\xd9"
+            return bytes(out)
+        if 0xD0 <= marker <= 0xD7 or marker == 0x01:
+            out += bytes((0xFF, marker))
+            continue
+        if i + 2 > n:
+            raise ImageError("JPEG bozuk")
+        length = int.from_bytes(data[i : i + 2], "big")
+        segment = data[i + 2 : i + length]
+        end = i + length
+        keep = not (0xE0 <= marker <= 0xEF or marker == 0xFE)
+        if marker in _JPEG_KEEP_APP and segment.startswith(_JPEG_KEEP_APP[marker]):
+            keep = True
+            if marker == 0xE0 and length > 16:  # JFIF içindeki küçük önizleme resmi atılır
+                segment = segment[:12] + b"\x00\x00"
+                length = 16
+        if keep:
+            out += bytes((0xFF, marker)) + length.to_bytes(2, "big") + segment
+        i = end
+        if marker == 0xDA:  # SOS: sıkıştırılmış veri bir sonraki gerçek işarete kadar sürer
+            start = i
+            while i + 1 < n and not (data[i] == 0xFF and data[i + 1] not in (0x00, 0xFF) and not 0xD0 <= data[i + 1] <= 0xD7):
+                i += 1
+            out += data[start:i]
+    raise ImageError("JPEG bozuk (EOI yok)")
+
+
+def _strip_png(data: bytes) -> bytes:
+    sig = b"\x89PNG\r\n\x1a\n"
+    if not data.startswith(sig):
+        raise ImageError("PNG değil")
+    out = bytearray(sig)
+    i = len(sig)
+    while i + 8 <= len(data):
+        length = int.from_bytes(data[i : i + 4], "big")
+        kind = data[i + 4 : i + 8]
+        chunk = data[i : i + 12 + length]
+        if len(chunk) != 12 + length:
+            raise ImageError("PNG bozuk")
+        if kind[:1].isupper() or kind in _PNG_KEEP:
+            out += chunk
+        i += 12 + length
+        if kind == b"IEND":
+            return bytes(out)
+    raise ImageError("PNG bozuk (IEND yok)")
+
+
+def _strip_webp(data: bytes) -> bytes:
+    if data[:4] != b"RIFF" or data[8:12] != b"WEBP":
+        raise ImageError("WEBP değil")
+    body = bytearray()
+    i = 12
+    while i + 8 <= len(data):
+        kind = data[i : i + 4]
+        size = int.from_bytes(data[i + 4 : i + 8], "little")
+        chunk = bytearray(data[i : i + 8 + size + (size & 1)])
+        if len(chunk) < 8 + size:
+            raise ImageError("WEBP bozuk")
+        if kind == b"VP8X":
+            chunk[8] &= ~0x0C & 0xFF  # EXIF ve XMP var bayrakları
+        if kind not in (b"EXIF", b"XMP "):
+            body += chunk
+        i += 8 + size + (size & 1)
+    return b"RIFF" + (len(body) + 4).to_bytes(4, "little") + b"WEBP" + bytes(body)
+
+
+def _strip_by_reencode(data: bytes, fmt: str) -> bytes:
+    """Kayıpsız biçimler (TIFF): pikseller aynen yeni dosyaya yazılır, özgün etiketler (EXIF, XMP, IPTC) taşınmaz."""
+    img = _open_image(io.BytesIO(data))
+    with img:
+        frames = []
+        for i in range(max(1, int(getattr(img, "n_frames", 1)))):
+            if i:
+                img.seek(i)
+            frame = img.copy()
+            frame.info = {}
+            frames.append(frame)
+    out = io.BytesIO()
+    frames[0].save(out, fmt, save_all=len(frames) > 1, append_images=frames[1:], compression="tiff_lzw")
+    return out.getvalue()
+
+
+def strip_metadata(data: bytes, suffix: str) -> bytes:
+    """Görselin EXIF/XMP/IPTC/metin meta verisini siler; pikseller yeniden kodlanmaz (JPEG kalitesi bozulmaz).
+
+    JPEG'de yalnızca yön bilgisi korunur. BMP meta veri taşımaz, olduğu gibi döner. Görsel
+    çözümlenemezse ImageError (çağıran dosyayı yazmaz).
+    """
+    ext = suffix.lower()
+    try:
+        if ext in (".jpg", ".jpeg"):
+            return _strip_jpeg(data)
+        if ext == ".png":
+            return _strip_png(data)
+        if ext == ".webp":
+            return _strip_webp(data)
+        if ext in (".tif", ".tiff"):
+            return _strip_by_reencode(data, "TIFF")
+    except (IndexError, ValueError, OSError) as exc:
+        raise ImageError("Görselin meta verisi silinemedi") from exc
+    return data
+
+
 def save_page_as_image(page: pymupdf.Page, target: Path) -> None:
     """Sayfayı görselin kendi boyutunda çizer ve hedefin biçiminde kaydeder (meta verisiz)."""
     pix = page.get_pixmap(matrix=pymupdf.Matrix(1, 1), annots=False, alpha=False)

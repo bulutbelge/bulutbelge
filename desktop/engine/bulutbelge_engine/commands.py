@@ -27,7 +27,7 @@ from bulutbelge_core.tanima import scan_document as tanima_scan_document
 from bulutbelge_core.ozel_nitelikli import scan_document, scan_special, special_warnings
 from bulutbelge_core.paste import scan_paste
 from bulutbelge_core.report import write_report, report_path
-from bulutbelge_core.pdf import PdfError, default_target, mask_pdf, render_page, scan_pdf
+from bulutbelge_core.pdf import OcrUnavailable, PdfError, default_target, mask_pdf, render_page, scan_pdf
 from bulutbelge_core.udf import UDF_EXTS, mask_udf, preview_text as udf_preview, scan_udf
 from bulutbelge_core.textdoc import TEXT_EXTS, mask_text_doc, read_text_doc, scan_text_doc
 from bulutbelge_core import office
@@ -98,6 +98,8 @@ def _user_errors(fn):
     def wrapper(params: dict[str, Any]) -> Any:
         try:
             return fn(params)
+        except OcrUnavailable as exc:
+            raise EngineError("ocr_unavailable", str(exc)) from None
         except (PdfError, PatternTimeout) as exc:
             raise EngineError("document", str(exc)) from None
         except RuleError as exc:

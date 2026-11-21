@@ -1,5 +1,6 @@
 import { KeyboardEvent, ReactNode, useState } from "react";
 import { useT } from "./i18n";
+import { LOGO_KIRMIZI, LOGO_MAVI, LOGO_VIEWBOX } from "./marka";
 
 // Küçük, satır içi SVG simgeler (uygulama çevrimdışı çalışır, simge kütüphanesi yok).
 const paths = {
@@ -80,20 +81,14 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
   );
 }
 
+/** Tescilli "bulut belge" logosu (desktop/marka/). Renkler temaya göre CSS değişkenlerinden gelir. */
 export function Logo() {
   return (
     <span className="logo">
-      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M7 18a4 4 0 0 1-.6-8 6 6 0 0 1 11.5 1.5A3.3 3.3 0 0 1 17.5 18H7Z"
-          fill="var(--accent-soft)"
-          stroke="var(--accent)"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-        <rect x="8.5" y="12.3" width="7" height="2.4" rx="1" fill="var(--mask)" />
+      <svg viewBox={LOGO_VIEWBOX} role="img" aria-label="BulutBelge">
+        <path className="logo-mavi" fillRule="evenodd" d={LOGO_MAVI} />
+        <path className="logo-kirmizi" fillRule="evenodd" d={LOGO_KIRMIZI} />
       </svg>
-      Bulut<span>Belge</span>
     </span>
   );
 }

@@ -1,5 +1,7 @@
 /* Renkler tanıtım sitesiyle (site/style.css) aynı; uygulamaya özgü olanlar eklendi. */
 :root {
+  --marka-mavi: #54688d;
+  --marka-kirmizi: #c5181c;
   --bg: #fbfaf7;
   --surface: #ffffff;
   --surface-2: #f4f2ec;
@@ -57,6 +59,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --marka-mavi: #9fb1d3;
+    --marka-kirmizi: #f0525a;
     --bg: #14161b;
     --surface: #1c1f26;
     --surface-2: #22262e;
@@ -106,6 +110,8 @@
 }
 
 :root[data-theme="dark"] {
+  --marka-mavi: #9fb1d3;
+  --marka-kirmizi: #f0525a;
   --bg: #14161b;
   --surface: #1c1f26;
   --surface-2: #22262e;
@@ -312,16 +318,16 @@ code,
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: -0.01em;
 }
 
-.logo > span {
-  color: var(--accent);
-  margin-left: -8px;
+/* Tescilli logo: açık temada marka renkleri (#54688D, #C5181C); koyu temada okunurluk için açık tonları. */
+.logo svg {
+  height: 18px;
+  width: auto;
+  display: block;
 }
+.logo-mavi { fill: var(--marka-mavi); }
+.logo-kirmizi { fill: var(--marka-kirmizi); }
 
 .mode-pill {
   font-size: 12px;

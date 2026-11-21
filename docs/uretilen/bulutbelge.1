@@ -1,25 +1,45 @@
 '\" Bu dosya üretilir, elle düzenlemeyin: `python core/tools/belge_uret.py`
 .TH BULUTBELGE 1 "" "BulutBelge" "Kullanıcı Komutları"
 .SH AD
-bulutbelge \- izinli klasörlerde maskeli okuma ve maskeli kopya yazma
+bulutbelge \- izinli klasörlerde değersiz tarama, maskeli okuma ve maskeli kopya yazma
 .SH ÖZET
 .nf
+bulutbelge scan [\-h] [\-\-profil PROFIL] [\-\-ajan AJAN] [\-\-json] dosya
 bulutbelge read [\-h] [\-\-profil PROFIL] [\-\-ajan AJAN] [\-\-json] dosya
 bulutbelge mask [\-h] [\-\-profil PROFIL] [\-\-ajan AJAN] [\-\-json] [\-\-hedef HEDEF] dosya
 bulutbelge folders [\-h] [\-\-json]
-bulutbelge kilavuz [\-h] [\-\-yonerge]
+bulutbelge kilavuz [\-h] [\-\-yonerge | \-\-skill]
+bulutbelge mcp [\-h]
 .fi
 .SH AÇIKLAMA
 .PP
-BulutBelge ajan komutu: izinli klasörlerde maskeli okuma ve maskeli kopya yazma.
+BulutBelge ajan komutu: izinli klasörlerde değersiz tarama, maskeli okuma ve maskeli kopya yazma.
 .SH KOMUTLAR
+.TP
+.B scan
+Belgeyi değiştirmeden tarar; yalnızca sayılar (değer yok)
+.RS
+.TP
+.B \-\-profil
+Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen). Yalnızca atanan takım ya da ondan sıkısı
+.RE
+.RS
+.TP
+.B \-\-ajan
+Ajanın adı (günlüğe yazılır), ör. claude\-code
+.RE
+.RS
+.TP
+.B \-\-json
+Çıktıyı JSON olarak ver
+.RE
 .TP
 .B read
 Belgenin maskeli metnini yazdırır
 .RS
 .TP
 .B \-\-profil
-Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen)
+Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen). Yalnızca atanan takım ya da ondan sıkısı
 .RE
 .RS
 .TP
@@ -37,7 +57,7 @@ Maskeli kopyayı yeni dosyaya yazar
 .RS
 .TP
 .B \-\-profil
-Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen)
+Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen). Yalnızca atanan takım ya da ondan sıkısı
 .RE
 .RS
 .TP
@@ -64,31 +84,46 @@ Maskeli kopyanın yolu (varsayılan: kaynağın yanında _maskeli)
 .RE
 .TP
 .B kilavuz
-Ajan kılavuzunu yazdırır (kurulum, komutlar, çıkış kodları, hazır yönerge)
+Ajan kılavuzunu yazdırır (kurulum, komutlar, çıkış kodları, hazır yönerge, beceri)
 .RS
 .TP
 .B \-\-yonerge
-Yalnızca ajanın talimat dosyasına eklenecek hazır yönergeyi yazdır
+Yalnızca ajanın talimat dosyasına (CLAUDE.md, AGENTS.md) eklenecek hazır yönergeyi yazdır
 .RE
+.RS
+.TP
+.B \-\-skill
+Claude Code beceri dosyasını (SKILL.md) yazdır
+.RE
+.TP
+.B mcp
+Yerel MCP sunucusu: yalnızca stdio, ağ portu açmaz (araçlar: folders, scan, read, mask)
 .SH ÇIKIŞ KODLARI
 .TP
 .B 0
 Başarılı. Ajan: Devam et.
 .TP
 .B 1
-Belge ya da işlem hatası (bozuk dosya, desteklenmeyen biçim, kaçak denetimi). Ajan: Hata mesajını kullanıcıya ilet; dosyayı başka yoldan okuma.
+Belge ya da işlem hatası (bozuk dosya, desteklenmeyen biçim, kaçak denetimi, OCR kullanılamıyor). Ajan: Hata mesajını kullanıcıya ilet; dosyayı başka yoldan okuma.
 .TP
 .B 2
 Kullanım hatası (yanlış argüman, kural takımı yok). Ajan: Komutu düzelt.
 .TP
 .B 3
-İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu. Ajan: Dur, mesajı aynen ilet; izni aşmaya çalışma.
+İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu, atanandan gevşek kural takımı. Ajan: Dur, mesajı aynen ilet; izni aşmaya çalışma.
 .TP
 .B 4
 İşlem günlüğü yazılamıyor; güvenlik için işlem yapılmadı. Ajan: Dur, kullanıcıya bildir.
 .SH JSON ÇIKTISI
 .PP
 \-\-json başarıda stdout'a tek satır JSON yazar.
+.SS scan \-\-json
+.TP
+.B ok
+boolean. Başarıda her zaman true
+.TP
+.B summary
+object. Tarama özeti (alanlar aşağıda); değer ve metin yok
 .SS read \-\-json
 .TP
 .B ok
@@ -113,7 +148,7 @@ array of string. İzinli klasörler
 .TP
 .B allow_write
 boolean. Maskeli kopya yazma izni
-.SS summary
+.SS summary (read, mask)
 .TP
 .B islem
 string. "okuma" ya da "maskeleme"
@@ -138,9 +173,32 @@ array of string. Uyarılar (ör. OCR); yoksa boş liste
 .TP
 .B not
 string | null. İşlem notu; yoksa null
+.SS summary (scan)
+.TP
+.B islem
+string. "tarama"
+.TP
+.B kaynak
+string. Kaynak belgenin mutlak yolu
+.TP
+.B kural_takimi
+string. Kullanılan kural takımının adı
+.TP
+.B bulunan
+integer. Bulunan değer sayısı (maskelenmez, gösterilmez)
+.TP
+.B turler
+object (string → integer). Veri türü adına göre bulunan sayı
+.TP
+.B sayfa
+integer. Sayfa sayısı (PDF/görsel sayfa, sunum slayt, arşiv dosya; diğerleri 1)
+.TP
+.B uyarilar
+array of string. Uyarılar (ör. OCR, özel nitelikli veri ipucu); yoksa boş liste
 .SH ÖRNEKLER
 .nf
 bulutbelge folders
+bulutbelge scan "C:\eBelgeler\eornek_basvuru.pdf" \-\-ajan claude\-code
 bulutbelge read "C:\eBelgeler\eornek_basvuru.pdf" \-\-ajan claude\-code
 bulutbelge mask "C:\eBelgeler\eornek_basvuru.pdf" \-\-ajan claude\-code \-\-json
 .fi
@@ -169,7 +227,7 @@ Ajan aracı izinli klasördeki dosyalara kabuktan doğrudan erişebiliyorsa Bulu
 .IP \(bu 2
 Başarılı mask işlemi arayüzdeki "Son yapılanlar" listesine "Ajan (ad)" etiketiyle de eklenir; read ve reddedilen çağrılar yalnızca işlem günlüğüne girer.
 .IP \(bu 2
-Taranmış sayfa ve fotoğrafın metin katmanı yoktur: OCR kuruluysa okunur ve maskelenir (OCR hata yapabilir); kurulu değilse read çıktısında içerikleri yer almaz, özette uyarı olarak geçer ve o sayfadaki veri maskelenmemiş olabilir.
+Taranmış sayfa ve fotoğrafın metin katmanı yoktur: OCR kuruluysa okunur ve maskelenir (OCR hata yapabilir); kurulu değilse (kurulum bozuk) read çıktısında içerikleri yer almaz ve özette uyarı olarak geçer; mask ise maskesiz sayfa yazmamak için reddedilir (çıkış 1, ocr_unavailable).
 .IP \(bu 2
 Maske kaldırma ve kasa açma komut satırında yoktur.
 .SH ŞUNA DA BAKIN

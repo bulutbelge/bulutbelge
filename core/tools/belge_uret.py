@@ -340,8 +340,10 @@ def man_sayfasi() -> str:
     for ad, alanlar in cli.JSON_OUTPUTS.items():
         c.append(f".SS {ad} \\-\\-json")
         c += [f".TP\n.B {_roff(a)}\n{_roff(t)}. {_roff(d)}" for a, t, d in alanlar]
-    c.append(".SS summary")
+    c.append(".SS summary (read, mask)")
     c += [f".TP\n.B {_roff(a)}\n{_roff(t)}. {_roff(d)}" for a, t, d in cli.SUMMARY_FIELDS]
+    c.append(".SS summary (scan)")
+    c += [f".TP\n.B {_roff(a)}\n{_roff(t)}. {_roff(d)}" for a, t, d in cli.SCAN_FIELDS]
     c += [".SH ÖRNEKLER", ".nf"]
     for ornek in cli.EXAMPLES["main"]:
         c.append(_roff(ornek))

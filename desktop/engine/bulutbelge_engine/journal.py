@@ -144,7 +144,7 @@ def unmask_text(fn: Callable[[], dict[str, Any]]) -> dict[str, Any]:
 
 
 # Kullanıcının ya da iznin reddettiği işlemler (hata değil).
-REFUSALS = {"not_allowed", "vault_locked", "write_not_allowed", "terms_unavailable"}
+REFUSALS = {"not_allowed", "vault_locked", "write_not_allowed", "terms_unavailable", "profile_not_allowed"}
 
 
 def _append_failure(lg: AuditLog, op: str, base: dict[str, Any], result: str, code: str) -> None:

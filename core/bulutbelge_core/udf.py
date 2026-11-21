@@ -36,6 +36,7 @@ MAX_UNZIPPED = 300 * 1024 * 1024
 CONTENT_PART = "content.xml"
 _PROPS_PART = "documentproperties.xml"
 _SIGNATURE_PARTS = ("sign.sgn",)
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp", ".emf", ".wmf", ".svg"}
 _PARSER = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False, strip_cdata=False)
 
 
@@ -125,8 +126,15 @@ def _notes(z: zipfile.ZipFile) -> list[str]:
     out = []
     if any(n in names for n in _SIGNATURE_PARTS):
         out.append("Belgede elektronik imza var; maskeli kopyada imza çıkarılır (içerik değiştiği için geçersiz olurdu).")
-    if any(n not in (CONTENT_PART, _PROPS_PART, *_SIGNATURE_PARTS) and not n.endswith("/") for n in names):
-        out.append("Belgede metin dışı dosyalar (görsel vb.) var; içleri taranmaz, maskeli kopyada olduğu gibi kalır.")
+    others = [n for n in names if n not in (CONTENT_PART, _PROPS_PART, *_SIGNATURE_PARTS) and not n.endswith("/")]
+    images = [n for n in others if Path(n).suffix.lower() in _IMAGE_SUFFIXES]
+    if images:
+        out.append(
+            f"Belgede {len(images)} görsel var: UDF içindeki görseller taranmadı, maskeli kopyada olduğu gibi kalır. "
+            "Kendiniz kontrol edin."
+        )
+    if len(others) > len(images):
+        out.append("Belgede metin dışı başka dosyalar var; içleri taranmaz, maskeli kopyada olduğu gibi kalır.")
     out.append("Maskeli UDF'de metin uzunluğu korunur: tüm yöntemler karartma olarak uygulanır.")
     return out
 

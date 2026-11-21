@@ -15,8 +15,11 @@ bütün olarak taranır, bulgular sonra parçalara geri eşlenir ve değer
 parçaların içinden silinir. Biçim, tablo, görsel, formül yapısı korunur.
 
 Değer yalnızca görünen metinden değil, gizli yerlerden de silinir: izlenen
-değişiklikte silinmiş metin, yorum yazarları, belge özellikleri, bulgu içeren
-dış bağlantı hedefleri. Kaçak denetimi arşivdeki TÜM XML parçalarının metnini ve
+değişiklikte silinmiş metin, yorum yazarları (Word `people.xml` dahil), belge
+özellikleri (`TitlesOfParts` taranır), bulgu içeren dış bağlantı hedefleri,
+grafik önbellekleri (`c:strCache`/`c:numCache` taranır), Excel özet tablo (pivot)
+önbelleği (kayıtlar boşaltılır, Excel açılışta yeniden oluşturur) ve gömülü
+görsellerin EXIF/meta verisi (bulgu olmasa da). Kaçak denetimi arşivdeki TÜM XML parçalarının metnini ve
 özniteliklerini okur; işaretli bir değer herhangi bir yerde kalmışsa dosya
 yazılmaz.
 """
@@ -37,7 +40,7 @@ from .gecici import gecici_klasor
 from .detect import MEDIUM, Finding, detect
 from .image import IMAGE_EXTS
 from .loose import find_split_cells
-from .pdf import PdfError, _normalize, count_types, unique_path
+from .pdf import OcrUnavailable, PdfError, _normalize, count_types, ocr_refusal, unique_path
 from .names import initials, name_hints
 from . import tablo
 from .rules import BLACKOUT, BLUR, INITIALS, KEEP_LAST4, LABEL, PSEUDONYM, Rules
@@ -53,6 +56,9 @@ A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
 S = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 TC = "{http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments}"
+C = "{http://schemas.openxmlformats.org/drawingml/2006/chart}"
+W15 = "{http://schemas.microsoft.com/office/word/2012/wordml}"
+VT = "{http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes}"
 XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
 
 _PROPS_PARTS = ("docProps/core.xml", "docProps/app.xml", "docProps/custom.xml")
@@ -81,12 +87,14 @@ WORD = OfficeFormat(
     name="Word",
     exts=frozenset({".docx"}),
     main_part="word/document.xml",
-    text_parts=re.compile(r"^word/(document|header\d*|footer\d*|footnotes|endnotes|comments)\.xml$"),
+    text_parts=re.compile(r"^word/(document|header\d*|footer\d*|footnotes|endnotes|comments|charts/chart\d+)\.xml$"),
     units=(W + "p",),
     texts=(W + "t", W + "instrText"),
     separators={W + "tab": "\t", W + "br": "\n", W + "cr": "\n"},
     removed=(W + "del", W + "moveFrom"),
     person_attrs=(W + "author", W + "initials"),
+    # Yorum yazarlarının listesi: ad yorumlardaki gibi boşaltılır, kimlik (userId) taşıyan öğe kaldırılır.
+    people_parts={"word/people.xml": (W15 + "author",)},
 )
 
 POWERPOINT = OfficeFormat(
@@ -110,7 +118,7 @@ EXCEL = OfficeFormat(
     main_part="xl/workbook.xml",
     # Yorumlar Excel'de xl/comments1.xml, bazı araçlarda xl/comments/comment1.xml olarak yazılır.
     text_parts=re.compile(
-        r"^xl/(sharedStrings|worksheets/sheet\d+|comments\d*|comments/[^/]+|threadedComments/[^/]+)\.xml$"
+        r"^xl/(sharedStrings|worksheets/sheet\d+|comments\d*|comments/[^/]+|threadedComments/[^/]+|charts/chart\d+)\.xml$"
     ),
     units=(S + "si", S + "is", S + "v", S + "text", TC + "text"),
     texts=(S + "t",),
@@ -121,6 +129,31 @@ EXCEL = OfficeFormat(
 )
 
 FORMATS = (WORD, POWERPOINT, EXCEL)
+
+# Grafik parçası (Word, PowerPoint, Excel): başlık ve etiket metni (`a:p`) ile önbellekteki her değer (`c:v`:
+# `c:strCache`, `c:numCache`, `c:strLit`, `c:numLit`, dizi adı) ayrı birim olarak aynı kurallarla taranır.
+# Word ve PowerPoint'te gömülü çalışma kitabı maskeli kopyadan silindiği için grafik önbellekten çizilir;
+# önbelleği boşaltmak grafiği yok ederdi. Sayı önbelleğinde maskelenen değerin noktası (`c:pt`) silinir.
+CHART_PART = re.compile(r"^(word|ppt|xl)/charts/chart\d+\.xml$")
+CHART = OfficeFormat(
+    name="Grafik",
+    exts=frozenset(),
+    main_part="",
+    text_parts=CHART_PART,
+    units=(A + "p", C + "v"),
+    texts=(A + "t",),
+    separators={A + "br": "\n"},
+    self_text=(C + "v",),
+)
+
+# Excel özet tablo (pivot) önbelleği: kayıtlar kaynak verinin tam kopyasıdır.
+PIVOT_RECORDS = re.compile(r"^xl/pivotCache/pivotCacheRecords\d*\.xml$")
+PIVOT_DEFINITION = re.compile(r"^xl/pivotCache/pivotCacheDefinition\d*\.xml$")
+
+
+def part_format(fmt: OfficeFormat, name: str) -> OfficeFormat:
+    """Parçanın birim tanımı: grafik parçaları biçimden bağımsız, diğerleri belgenin biçimi."""
+    return CHART if CHART_PART.match(name) else fmt
 
 
 def format_of(path: str | os.PathLike) -> OfficeFormat | None:
@@ -258,7 +291,7 @@ def load(z: zipfile.ZipFile, fmt: OfficeFormat, rules: Rules) -> tuple[dict[str,
         root = parse(z.read(name))
         removed += _remove_tracked(fmt, root)
         roots[name] = root
-        for ui, (_u, segments) in enumerate(units(fmt, root)):
+        for ui, (_u, segments) in enumerate(units(part_format(fmt, name), root)):
             text = unit_text(segments)
             if text.strip():
                 pending.append((name, ui, text))
@@ -361,7 +394,7 @@ def _split_table_findings(
     out: list[OfficeFinding] = []
     seen = {(f.part, f.unit) for f in existing}
     for name, root in roots.items():
-        unit_list = units(fmt, root)
+        unit_list = units(part_format(fmt, name), root)
         index = {u: (i, unit_text(s)) for i, (u, s) in enumerate(unit_list)}
         for row in root.iter(ns + "tr"):
             groups: list[list[tuple[int, str]]] = []
@@ -415,14 +448,22 @@ def warnings_for(z: zipfile.ZipFile, fmt: OfficeFormat, roots: dict[str, etree._
     media = [n for n in names if "/media/" in n]
     unscanned = [n for n in media if not _is_scannable_media(n)]
     if unscanned:
+        kinds = ", ".join(sorted({(Path(n).suffix.lstrip(".") or "?").upper() for n in unscanned}))
         out.append(
-            f"Belgede {len(unscanned)} görsel var. Görsellerdeki yazı ve yüzler taranmaz; gerekirse belgeyi PDF'e "
-            "çevirip “Alan seç” ile maskeleyin."
+            f"Belgede taranamayan {len(unscanned)} görsel var ({kinds}): içlerindeki yazı ve yüzler taranmadı, "
+            "maskeli kopyada olduğu gibi kalır. Kendiniz kontrol edin; gerekirse belgeyi PDF'e çevirip "
+            "“Alan seç” ile maskeleyin."
         )
     if removed:
         out.append("Belgede izlenen değişiklik var. Silinmiş metin maskeli kopyada tamamen kaldırılır.")
     if any("/embeddings/" in n for n in names):
         out.append("Belgede gömülü dosya (başka bir belge ya da tablo) var; içi taranmaz, maskeli kopyada silinir.")
+    charts = [n for n in names if CHART_PART.match(n)]
+    if charts:
+        out.append(
+            f"Belgede {len(charts)} grafik var. Grafikteki başlık, etiket ve önbellek değerleri de taranır; "
+            "maskelenen sayı değerleri grafikte boş görünür."
+        )
     if any("comment" in n.lower() for n in roots):
         out.append("Belgede yorum var. Yorumlar da taranır; yorum yazarlarının adı silinir.")
     if fmt is EXCEL:
@@ -432,9 +473,12 @@ def warnings_for(z: zipfile.ZipFile, fmt: OfficeFormat, roots: dict[str, etree._
                 f"Çalışma kitabında {len(hidden)} gizli / çok gizli sayfa var; içleri taranır "
                 "(dışa aktarımda görünür yapmak için Excel güvenlik seçeneğini kullanabilirsiniz)."
             )
-        charts = [n for n in names if n.startswith("xl/charts/chart") and n.endswith(".xml")]
-        if charts:
-            out.append(f"Belgede {len(charts)} grafik var; grafik veri etiketleri ve serileri sızıntı taşıyabilir.")
+        pivots = [n for n in names if PIVOT_DEFINITION.match(n)]
+        if pivots:
+            out.append(
+                f"Çalışma kitabında {len(pivots)} özet tablo (pivot) önbelleği var. Maskeli kopyada önbellek kayıtları "
+                "silinir, önbellekteki değerler taranır; Excel tabloyu açılışta maskeli veriden yeniden oluşturur."
+            )
         out.append(
             "Excel'de tarih biçimli hücreler (doğum tarihi gibi) sayı olarak saklanır ve bu türde bulunamaz; "
             "gerekirse sütunu metin olarak kaydedin."
@@ -462,23 +506,28 @@ def _media_findings(data: bytes, suffix: str, rules: Rules) -> list | None:
             return None
 
 
-def _mask_media(data: bytes, suffix: str, rules: Rules) -> tuple[bytes, int, bool]:
+def _mask_media(data: bytes, suffix: str, rules: Rules, require_ocr: bool = True) -> tuple[bytes, int, bool]:
     """Görseli maskeler: (yeni veri, maskelenen sayısı, taranabildi mi).
 
-    Bulgu yoksa görsel olduğu gibi kalır (yeniden kodlama kaliteyi bozmasın).
+    Bulgu yoksa görsel yeniden kodlanmaz (kalite bozulmasın) ama EXIF/meta verisi silinir.
     """
+    from .image import ImageError, strip_metadata
     from .pdf import mask_pdf
 
     found = _media_findings(data, suffix, rules)
     if found is None:
         return data, 0, False
     if not found:
-        return data, 0, True
+        try:
+            return strip_metadata(data, suffix), 0, True
+        except ImageError:
+            # Meta verisi silinemeyen görsel kopyaya girmez (konum, cihaz, yazar bilgisi kalmasın).
+            raise PdfError("Belgedeki bir görselin meta verisi (EXIF) silinemedi. Dosya yazılmadı.") from None
     with gecici_klasor("bb-gorsel-") as tmp:
         src = Path(tmp) / f"g{suffix}"
         src.write_bytes(data)
         try:
-            res = mask_pdf(src, Path(tmp) / f"c{suffix}", rules)
+            res = mask_pdf(src, Path(tmp) / f"c{suffix}", rules, require_ocr=require_ocr)
         except Exception:
             # Maskelenemeyen görsel kopyaya girmez (değer görselde kalmasın).
             raise PdfError("Belgedeki bir görselde bulgu var ama görsel maskelenemedi. Dosya yazılmadı.") from None
@@ -495,7 +544,10 @@ def _media_warnings(scanned: int, masked: int, failed: int) -> list[str]:
             "Görsel bulguları ayrı ayrı onaylanmaz; sonucu maskeli kopyada kontrol edin."
         )
     if scanned and not ocr_available():
-        out.append("Belgedeki görsellerde yazı okunamadı (OCR dil dosyaları kurulu değil); yalnızca yüz tarandı.")
+        out.append(
+            "Belgedeki görsellerde yazı okunamadı (OCR dil dosyaları kurulu değil); yalnızca yüz tarandı. "
+            "OCR kullanılamadan maskeli kopya yazılmaz; BulutBelge'yi yeniden kurun."
+        )
     if failed:
         out.append(f"Belgede {failed} görsel açılamadı; taranmadı ve kopyada olduğu gibi kaldı.")
     return out
@@ -527,13 +579,28 @@ def _apply(fmt: OfficeFormat, roots: dict[str, etree._Element], included: list[O
     for f in included:
         by_unit.setdefault((f.part, f.unit), []).append(f)
     for part, root in roots.items():
-        all_units = units(fmt, root)
+        all_units = units(part_format(fmt, part), root)
         for (p, ui), items in by_unit.items():
             if p == part:
                 el, segments = all_units[ui]
                 _apply_unit(segments, items)
                 if el.tag == S + "v":
                     _number_to_text(el)
+                elif el.tag == C + "v":
+                    _chart_number_point(el)
+
+
+def _chart_number_point(v: etree._Element) -> None:
+    """Grafik sayı önbelleğinde maskelenen değer sayı olamaz: nokta (`c:pt`) silinir, grafikte boş görünür."""
+    pt = v.getparent()
+    if pt is None or pt.tag != C + "pt" or pt.getparent() is None:
+        return
+    if pt.getparent().tag not in (C + "numCache", C + "numLit"):
+        return
+    try:
+        float(v.text or "")
+    except ValueError:
+        pt.getparent().remove(pt)
 
 
 def _apply_unit(segments: list[_Segment], items: list[OfficeFinding]) -> None:
@@ -594,10 +661,7 @@ def _sweep_attributes(roots: dict[str, etree._Element], included: list[OfficeFin
     (gizli-word.docx görsel alternatif metni). Metin öznitelikleri ayrıca taranır. Her bulgunun değeri, bulunduğu yerin yerine
     konan metinle aynı biçimde değiştirilir; uzun değerler önce.
     """
-    pairs = sorted(
-        {(f.finding.value, f.replacement) for f in included if len(f.finding.value) >= 3 and f.finding.value != f.replacement},
-        key=lambda p: -len(p[0]),
-    )
+    pairs = _value_pairs(included)
     for root in roots.values():
         for el in root.iter():
             if not isinstance(el.tag, str):
@@ -621,11 +685,43 @@ def _scrub_people_part(attrs: tuple[str, ...], data: bytes) -> bytes:
         for a in attrs:
             if a in el.attrib:
                 el.set(a, "")
+    for el in list(root.iter(W15 + "presenceInfo")):
+        el.getparent().remove(el)  # Word people.xml: hesap kimliği (userId, providerId)
     return _dump(root)
 
 
-def _scrub_props(name: str, data: bytes) -> bytes:
+def _mask_free_text(text: str, rules: Rules, pairs: list[tuple[str, str]]) -> tuple[str, list[str]]:
+    """Gizli bir yerdeki serbest metni maskeler: önce belgede bulunan değerler, sonra metnin kendi taraması.
+
+    (yeni metin, metinde bulunan özgün değerler) döner; değerler kaçak denetimine eklenir.
+    """
+    new, found = text, []
+    for old, repl in pairs:
+        if old in new:
+            new = new.replace(old, repl)
+            found.append(old)
+    for f in sorted(detect(new, rules), key=lambda f: -f.start):
+        found.append(f.value)
+        new = new[: f.start] + _replacement(f, rules) + new[f.end :]
+    return new, found
+
+
+def _value_pairs(included: list[OfficeFinding]) -> list[tuple[str, str]]:
+    """Bulunan değer → yerine yazılan metin; uzun değerler önce (kısa değer uzunun içini bozmasın)."""
+    return sorted(
+        {(f.finding.value, f.replacement) for f in included if len(f.finding.value) >= 3 and f.finding.value != f.replacement},
+        key=lambda p: -len(p[0]),
+    )
+
+
+def _scrub_props(name: str, data: bytes, rules: Rules, pairs: list[tuple[str, str]]) -> tuple[bytes, list[str]]:
+    """Belge özelliklerini temizler; (yeni veri, `TitlesOfParts` metninde bulunan özgün değerler) döner.
+
+    `TitlesOfParts` (sayfa, slayt, bölüm adları) boşaltılmaz (Office sayılarını `HeadingPairs` ile eşler);
+    metinleri aynı kurallarla taranıp maskelenir.
+    """
     root = parse(data)
+    found: list[str] = []
     for el in root.iter():
         if not isinstance(el.tag, str):
             continue
@@ -636,7 +732,64 @@ def _scrub_props(name: str, data: bytes) -> bytes:
             el.text = ""
         elif name == "docProps/custom.xml" and len(el) == 0 and local != "Properties":
             el.text = ""
+    if name == "docProps/app.xml":
+        for titles in root.iter("{*}TitlesOfParts"):
+            for el in titles.iter(VT + "lpstr", VT + "lpwstr"):
+                if el.text and el.text.strip():
+                    el.text, values = _mask_free_text(el.text, rules, pairs)
+                    found += values
+    return _dump(root), found
+
+
+# ---------------------------------------------------------------- Excel özet tablo (pivot) önbelleği
+
+
+def _empty_pivot_records(data: bytes) -> bytes:
+    """Önbellek kayıtları (kaynak verinin kopyası) boşaltılır; kök öğe kalır, `count` sıfırlanır."""
+    root = parse(data)
+    for child in list(root):
+        root.remove(child)
+    root.set("count", "0")
     return _dump(root)
+
+
+def _mask_pivot_definition(data: bytes, rules: Rules, pairs: list[tuple[str, str]]) -> tuple[bytes, list[str]]:
+    """Önbellek tanımı: açılışta yenileme işaretlenir, alan öğeleri (`sharedItems`) taranıp maskelenir.
+
+    Son yenileyen kullanıcının adı (`refreshedBy`) silinir. Öğeler silinmez (özet tablo onlara sırayla başvurur): metin öğesi maskeli metne çevrilir, bulgu taşıyan
+    sayı öğesi 0 olur; maskeden sonra aynı kalan metinler ayırt edilir (Excel yinelenen öğeyi onarmaya kalkmasın).
+    En küçük/en büyük değer öznitelikleri bulgu taşıyorsa silinir (isteğe bağlıdır). Excel açılışta tabloyu
+    maskeli hücrelerden yeniden oluşturur.
+    """
+    root = parse(data)
+    root.set("refreshOnLoad", "1")
+    root.attrib.pop("refreshedBy", None)  # son yenileyen kullanıcının adı
+    if root.get("recordCount") is not None:
+        root.set("recordCount", "0")  # kayıtlar boşaltıldı
+    found: list[str] = []
+    for shared in root.iter(S + "sharedItems"):
+        for attr in ("minValue", "maxValue", "minDate", "maxDate"):
+            value = shared.get(attr)
+            if value and _mask_free_text(value, rules, pairs)[1]:
+                found += _mask_free_text(value, rules, pairs)[1]
+                del shared.attrib[attr]
+        seen: dict[str, int] = {}
+        for item in shared:
+            value = item.get("v")
+            if not value or item.tag not in (S + "s", S + "n"):
+                continue
+            new, values = _mask_free_text(value, rules, pairs)
+            if not values:
+                seen[value] = seen.get(value, 0) + 1
+                continue
+            found += values
+            if item.tag == S + "n":
+                item.set("v", "0")
+                continue
+            n = seen.get(new, 0) + 1
+            seen[new] = n
+            item.set("v", new if n == 1 else f"{new} ({n})")
+    return _dump(root), found
 
 
 def _is_thumbnail(name: str) -> bool:
@@ -1125,8 +1278,7 @@ def _sanitize_excel_parts(
                 el.text = ""
         return _dump(cm)
     if options.get("strip_charts") and name.startswith("xl/charts/chart") and name.endswith(".xml"):
-        ch = parse(raw_bytes)
-        C = "{http://schemas.openxmlformats.org/drawingml/2006/chart}"
+        ch = parse(root_bytes if root_bytes is not None else raw_bytes)
         for el in ch.iter(A + "t", C + "t"):
             if el.text:
                 el.text = ""
@@ -1145,12 +1297,17 @@ def mask_bytes(
     manual_cells: list[CellSelection] | None = None,
     stats: dict[str, int] | None = None,
     options: dict | None = None,
+    hidden_out: list[str] | None = None,
+    require_ocr: bool = True,
 ) -> tuple[bytes, list[str], list[OfficeFinding], list[OfficeFinding]]:
     """Maskeli belgeyi bellekte üretir: (veri, uyarılar, dahil edilenler, tüm bulgular).
 
     `manual_cells` (yalnızca Excel): bu satır ve sütunlardaki dolu hücrelerin tamamı silinir.
     `stats` verilirse elle silinen hücre sayısı "elle" anahtarına yazılır.
     `options` (yalnızca Excel): unhide_sheets, flatten_formulas, strip_comments, strip_charts (isteğe bağlı güvenli temizlik).
+    `hidden_out`: verilirse gizli yerlerde (belge özellikleri, pivot önbelleği) maskelenen özgün değerler eklenir
+    (kaçak denetimi için; yalnızca bellekte).
+    `require_ocr`: taranabilen görsel varsa ve OCR yapılamıyorsa OcrUnavailable (K3; bkz. pdf.mask_pdf).
     """
     excluded_ids = excluded_ids or set()
     opts = options or {}
@@ -1198,22 +1355,39 @@ def mask_bytes(
                 "maskeli kopyadan silindi."
             )
 
+        from .ocr import ocr_available
+
+        scannable = [n for n in z.namelist() if _is_scannable_media(n)]
+        if scannable and require_ocr and not ocr_available():
+            # Görseldeki yazı okunamaz; görsel sessizce maskesiz kalmasın (K3).
+            raise OcrUnavailable(ocr_refusal(f"belgedeki {len(scannable)} görselin"))
         media: dict[str, bytes] = {}
         media_masked = media_failed = media_scanned = 0
-        for name in z.namelist():
-            if not _is_scannable_media(name):
-                continue
-            data, n, ok = _mask_media(z.read(name), Path(name).suffix.lower(), rules)
+        for name in scannable:
+            data, n, ok = _mask_media(z.read(name), Path(name).suffix.lower(), rules, require_ocr)
             if not ok:
                 media_failed += 1
                 continue
             media_scanned += 1
-            if n:
-                media[name] = data
-                media_masked += n
+            media[name] = data  # bulgu yoksa da: meta verisi silinmiş hâli
+            media_masked += n
         if media_masked and stats is not None:
             stats["görsel"] = stats.get("görsel", 0) + media_masked
         warnings += _media_warnings(media_scanned, media_masked, media_failed)
+
+        # Gizli kopyalar: belge özellikleri (TitlesOfParts) ve pivot önbellek tanımı. Bulunan değerler kaçak
+        # denetimine eklenir (hidden_values).
+        pairs = _value_pairs(included)
+        hidden: dict[str, bytes] = {}
+        hidden_values: list[str] = []
+        for name in z.namelist():
+            if name in _PROPS_PARTS:
+                hidden[name], values = _scrub_props(name, z.read(name), rules, pairs)
+            elif fmt is EXCEL and PIVOT_DEFINITION.match(name):
+                hidden[name], values = _mask_pivot_definition(z.read(name), rules, pairs)
+            else:
+                continue
+            hidden_values += values
 
         out = io.BytesIO()
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as dst:
@@ -1231,8 +1405,10 @@ def mask_bytes(
                     data = _dump(roots[name])
                 elif name in media:
                     data = media[name]
-                elif name in _PROPS_PARTS:
-                    data = _scrub_props(name, z.read(name))
+                elif name in hidden:
+                    data = hidden[name]
+                elif fmt is EXCEL and PIVOT_RECORDS.match(name):
+                    data = _empty_pivot_records(z.read(name))
                 elif name in fmt.people_parts:
                     data = _scrub_people_part(fmt.people_parts[name], z.read(name))
                 elif name.endswith(".rels"):
@@ -1243,13 +1419,17 @@ def mask_bytes(
                 else:
                     data = z.read(name)
                 if fmt is EXCEL and opts and name not in _PROPS_PARTS and not name.endswith(".rels"):
-                    data = _sanitize_excel_parts(name, data if name in roots else None, z.read(name), opts)
+                    # İşlenmiş veri verilir: özgün bayt verilseydi maskelenmiş görsel, yazar listesi ve pivot
+                    # önbelleği güvenli temizlik seçenekleri açıkken kopyaya özgün hâliyle geri girerdi.
+                    data = _sanitize_excel_parts(name, data, z.read(name), opts)
                     if data is None:
                         continue  # örn. calcChain.xml: formüller düzleştirilince gereksiz
                 # Sabit zaman damgası; orijinal ZIP'in ek alanları (kişisel olabilir) taşınmaz.
                 new = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
                 new.compress_type = zipfile.ZIP_DEFLATED
                 dst.writestr(new, data)
+    if hidden_out is not None:
+        hidden_out.extend(hidden_values)
     return out.getvalue(), warnings, included, findings
 
 
@@ -1263,6 +1443,7 @@ def mask(
     counts: dict[str, int] | None = None,
     manual_cells: list[CellSelection] | None = None,
     options: dict | None = None,
+    require_ocr: bool = True,
 ) -> tuple[str, int, list[str]]:
     """Maskeli kopyayı yazar; (hedef yol, maskelenen sayısı, uyarılar) döner.
 
@@ -1281,8 +1462,11 @@ def mask(
     dst = unique_path(dst)
 
     stats: dict[str, int] = {}
-    data, warnings, included, findings = mask_bytes(src, fmt, rules, excluded_ids, manual_cells, stats, options=options)
-    verify(data, included, findings)
+    hidden: list[str] = []
+    data, warnings, included, findings = mask_bytes(
+        src, fmt, rules, excluded_ids, manual_cells, stats, options=options, hidden_out=hidden, require_ocr=require_ocr
+    )
+    verify(data, included, findings, hidden)
 
     tmp_fd, tmp_name = tempfile.mkstemp(suffix=dst.suffix, dir=dst.parent)
     try:
@@ -1320,7 +1504,11 @@ def all_text(data: bytes) -> str:
     return "".join(parts)
 
 
-def verify(data: bytes, included: list[OfficeFinding], findings: list[OfficeFinding]) -> None:
+def verify(
+    data: bytes, included: list[OfficeFinding], findings: list[OfficeFinding], hidden: list[str] | None = None
+) -> None:
+    """Kaçak denetimi: maskelenen her değer (gizli yerlerde maskelenenler, `hidden`, dahil) çıktının hiçbir XML
+    parçasında (grafik ve pivot önbelleği, belge özellikleri, yazar listeleri dahil) okunmamalı."""
     text = _normalize(all_text(data))
     included_ids = {f.id for f in included}
     kept = {_normalize(f.finding.value) for f in findings if f.id not in included_ids}
@@ -1329,7 +1517,8 @@ def verify(data: bytes, included: list[OfficeFinding], findings: list[OfficeFind
         for f in included
         if _normalize(f.finding.value) not in _normalize(f.replacement)
         and f.finding.source != SPLIT_NOTE  # kısa parçalar başka yerlerde rastlantıyla geçer
-    } - kept
+    } | {_normalize(v) for v in hidden or [] if len(v.strip()) >= 3}
+    must_be_gone -= kept
     kalan = aktif_icerik_kaldi(data)
     if kalan:
         raise PdfError(f"Aktif içerik kaldı ({', '.join(kalan[:3])}). Dosya yazılmadı.")

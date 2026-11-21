@@ -1,11 +1,15 @@
 """Ajan için komut satırı (karar: docs/kararlar/2026-11-05-ajan-yerel-kullanim.md).
 
+    python -m bulutbelge_engine.cli scan  <dosya>  [--profil ID] [--ajan AD] [--json]
     python -m bulutbelge_engine.cli read  <dosya>  [--profil ID] [--ajan AD] [--json]
     python -m bulutbelge_engine.cli mask  <dosya>  [--hedef YOL] [--profil ID] [--ajan AD] [--json]
     python -m bulutbelge_engine.cli folders [--json]
+    python -m bulutbelge_engine.cli mcp     (yerel MCP sunucusu, yalnızca stdio; bkz. mcp.py)
 
-Kurallar (kodda korunur):
+Kurallar (kodda korunur; iç işlevler ajan.py'de, yerel MCP sunucusuyla ortak):
+- Tarama (scan) değer döndürmez: yalnızca tür bazında sayılar, sayfa sayısı ve uyarılar.
 - Okuma maskeli döner: belge maskelenir, metin maskeli kopyadan çıkarılır.
+- Ajan için atanan kural takımı üst sınırdır; --profil daha gevşek takım seçemez.
 - Yalnızca kullanıcının Ayarlar › Ajan erişimi bölümünde tanımladığı klasörlerde çalışır.
 - Yazma (mask) kullanıcı ayrıca izin verdiyse yapılır; her zaman yeni dosyaya, mevcut dosya
   üzerine yazılmaz. Maske kaldırma (takma ad geri çevirme) bu komutta yoktur.
@@ -20,18 +24,15 @@ Kurallar (kodda korunur):
 from __future__ import annotations
 
 import argparse
+import contextvars
 import json
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Any
 
 APP_ID = "com.proteksistem.bulutbelge"
 DEV_ENV = "BULUTBELGE_GELISTIRME"
-# --ajan değeri işlem günlüğüne ve CSV dışa aktarımına girer: güvenli karakter kümesi (F15).
-_AGENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
-
 EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_REFUSED, EXIT_LOG = 0, 1, 2, 3, 4
 
 # Çıkış kodları: kod -> (anlamı, ajan ne yapmalı). Metinler docs/AJAN-KOMUT-SATIRI.md'deki
@@ -39,12 +40,12 @@ EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_REFUSED, EXIT_LOG = 0, 1, 2, 3, 4
 EXIT_CODES: dict[int, tuple[str, str]] = {
     EXIT_OK: ("Başarılı", "Devam et"),
     EXIT_ERROR: (
-        "Belge ya da işlem hatası (bozuk dosya, desteklenmeyen biçim, **kaçak denetimi**)",
+        "Belge ya da işlem hatası (bozuk dosya, desteklenmeyen biçim, **kaçak denetimi**, OCR kullanılamıyor)",
         "Hata mesajını kullanıcıya ilet; dosyayı başka yoldan okuma",
     ),
     EXIT_USAGE: ("Kullanım hatası (yanlış argüman, kural takımı yok)", "Komutu düzelt"),
     EXIT_REFUSED: (
-        "İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu",
+        "İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu, atanandan gevşek kural takımı",
         "**Dur**, mesajı aynen ilet; izni aşmaya çalışma",
     ),
     EXIT_LOG: ("İşlem günlüğü yazılamıyor; güvenlik için işlem yapılmadı", "**Dur**, kullanıcıya bildir"),
@@ -62,8 +63,23 @@ SUMMARY_FIELDS: list[tuple[str, str, str]] = [
     ("not", "string | null", "İşlem notu; yoksa null"),
 ]
 
+# scan --json özet alanları: değer yok, yalnızca sayılar. Kılavuzdaki "scan --json" tablosuyla aynıdır.
+SCAN_FIELDS: list[tuple[str, str, str]] = [
+    ("islem", "string", '"tarama"'),
+    ("kaynak", "string", "Kaynak belgenin mutlak yolu"),
+    ("kural_takimi", "string", "Kullanılan kural takımının adı"),
+    ("bulunan", "integer", "Bulunan değer sayısı (maskelenmez, gösterilmez)"),
+    ("turler", "object (string → integer)", "Veri türü adına göre bulunan sayı"),
+    ("sayfa", "integer", "Sayfa sayısı (PDF/görsel sayfa, sunum slayt, arşiv dosya; diğerleri 1)"),
+    ("uyarilar", "array of string", "Uyarılar (ör. OCR, özel nitelikli veri ipucu); yoksa boş liste"),
+]
+
 # Komut -> --json çıktısının üst düzey alanları: (alan, tür, açıklama).
 JSON_OUTPUTS: dict[str, list[tuple[str, str, str]]] = {
+    "scan": [
+        ("ok", "boolean", "Başarıda her zaman true"),
+        ("summary", "object", "Tarama özeti (alanlar aşağıda); değer ve metin yok"),
+    ],
     "read": [
         ("ok", "boolean", "Başarıda her zaman true"),
         ("text", "string", "Belgenin maskeli metni"),
@@ -95,15 +111,20 @@ def _json_help(command: str) -> str:
     lines += [f"  {a:<12} {t:<10} {d}" for a, t, d in JSON_OUTPUTS[command]]
     if command != "folders":
         lines.append("  summary alanları:")
-        lines += [f"    {a:<13} {t:<27} {d}" for a, t, d in SUMMARY_FIELDS]
+        lines += [f"    {a:<13} {t:<27} {d}" for a, t, d in (SCAN_FIELDS if command == "scan" else SUMMARY_FIELDS)]
     return "\n".join(lines)
 
 
 EXAMPLES: dict[str, list[str]] = {
     "main": [
         "bulutbelge folders",
+        'bulutbelge scan "C:\\Belgeler\\ornek_basvuru.pdf" --ajan claude-code',
         'bulutbelge read "C:\\Belgeler\\ornek_basvuru.pdf" --ajan claude-code',
         'bulutbelge mask "C:\\Belgeler\\ornek_basvuru.pdf" --ajan claude-code --json',
+    ],
+    "scan": [
+        'bulutbelge scan "C:\\Belgeler\\ornek_basvuru.pdf" --ajan claude-code',
+        'bulutbelge scan "C:\\Belgeler\\ornek_tablo.xlsx" --json --ajan claude-code',
     ],
     "read": [
         'bulutbelge read "C:\\Belgeler\\ornek_basvuru.pdf" --ajan claude-code',
@@ -116,7 +137,11 @@ EXAMPLES: dict[str, list[str]] = {
         'bulutbelge mask "C:\\Belgeler\\ornek_tablo.xlsx" --json --ajan claude-code',
     ],
     "folders": ["bulutbelge folders", "bulutbelge folders --json"],
-    "kilavuz": ["bulutbelge kilavuz", "bulutbelge kilavuz --yonerge"],
+    "kilavuz": ["bulutbelge kilavuz", "bulutbelge kilavuz --yonerge", "bulutbelge kilavuz --skill"],
+    "mcp": [
+        "claude mcp add bulutbelge -- bulutbelge mcp",
+        "BULUTBELGE_AJAN=cursor bulutbelge mcp",
+    ],
 }
 
 
@@ -161,7 +186,7 @@ class CliError(Exception):
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="bulutbelge",
-        description="BulutBelge ajan komutu: izinli klasörlerde maskeli okuma ve maskeli kopya yazma.",
+        description="BulutBelge ajan komutu: izinli klasörlerde değersiz tarama, maskeli okuma ve maskeli kopya yazma.",
         epilog=_epilog("main") + "\n\nKomutlar için: bulutbelge <komut> --help",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -172,11 +197,17 @@ def _parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--profil", help="Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen)")
+    common.add_argument(
+        "--profil",
+        help="Kural takımı kimliği (varsayılan: Ayarlar'da ajan için seçilen). Yalnızca atanan takım ya da ondan sıkısı",
+    )
     common.add_argument("--ajan", help="Ajanın adı (günlüğe yazılır), ör. claude-code")
     common.add_argument("--json", action="store_true", help="Çıktıyı JSON olarak ver")
 
     raw = argparse.RawDescriptionHelpFormatter
+    sc = sub.add_parser("scan", parents=[common], help="Belgeyi değiştirmeden tarar; yalnızca sayılar (değer yok)",
+                        epilog=_epilog("scan"), formatter_class=raw)
+    sc.add_argument("dosya")
     r = sub.add_parser("read", parents=[common], help="Belgenin maskeli metnini yazdırır",
                        epilog=_epilog("read"), formatter_class=raw)
     r.add_argument("dosya")
@@ -187,83 +218,73 @@ def _parser() -> argparse.ArgumentParser:
     f = sub.add_parser("folders", help="İzinli klasörleri ve yazma iznini gösterir",
                        epilog=_epilog("folders"), formatter_class=raw)
     f.add_argument("--json", action="store_true")
-    k = sub.add_parser("kilavuz", help="Ajan kılavuzunu yazdırır (kurulum, komutlar, çıkış kodları, hazır yönerge)",
+    k = sub.add_parser("kilavuz", help="Ajan kılavuzunu yazdırır (kurulum, komutlar, çıkış kodları, hazır yönerge, beceri)",
                        epilog=_epilog("kilavuz"), formatter_class=raw)
-    k.add_argument("--yonerge", action="store_true", help="Yalnızca ajanın talimat dosyasına eklenecek hazır yönergeyi yazdır")
+    sub.add_parser(
+        "mcp",
+        help="Yerel MCP sunucusu: yalnızca stdio, ağ portu açmaz (araçlar: folders, scan, read, mask)",
+        description="Ajan aracının alt süreç olarak başlattığı MCP sunucusu: yalnızca stdio, ağ portu açmaz. Araçlar komut satırıyla aynı izin "
+        "denetimini ve işlem günlüğünü kullanır. Ajan adı BULUTBELGE_AJAN ortam değişkeninden ya da istemcinin adından.",
+        epilog=_epilog("mcp", with_codes=False),
+        formatter_class=raw,
+    )
+    kg = k.add_mutually_exclusive_group()
+    kg.add_argument("--yonerge", action="store_true", help="Yalnızca ajanın talimat dosyasına (CLAUDE.md, AGENTS.md) eklenecek hazır yönergeyi yazdır")
+    kg.add_argument("--skill", action="store_true", help="Claude Code beceri dosyasını (SKILL.md) yazdır")
     return p
 
 
-def _profile(settings_mod: Any, wanted: str | None, agent_cfg: dict[str, Any]) -> dict[str, Any]:
-    s = settings_mod.load_settings()
-    pid = wanted or agent_cfg.get("profile") or s["active"]
-    for p in s["profiles"]:
-        if p["id"] == pid:
-            return p
-    raise CliError("invalid_params", f"Kural takımı bulunamadı: {pid}", EXIT_USAGE)
+def _print_scan(summary: dict[str, Any], out) -> None:
+    from .ajan import format_scan
 
-
-def _summary(op: str, source: str, profile: dict[str, Any], result: dict[str, Any], target: str | None) -> dict[str, Any]:
-    from bulutbelge_core.rules import DATA_TYPES
-
-    counts = result.get("counts") or {}
-    return {
-        "islem": op,
-        "kaynak": source,
-        "hedef": target,
-        "kural_takimi": profile["name"],
-        "maskelenen": int(result.get("masked") or sum(counts.values())),
-        "turler": {DATA_TYPES[k].label if k in DATA_TYPES else k: n for k, n in counts.items()},
-        "uyarilar": list(result.get("warnings") or []),
-        "not": result.get("changed"),
-    }
-
-
-def _record_recent(settings_mod: Any, source: str, profile: dict[str, Any], result: dict[str, Any], agent: str | None) -> None:
-    """Ajanın yazdığı maskeli kopyayı arayüzdeki "Son yapılanlar" listesine ekler ("Ajan" etiketiyle).
-
-    Yardımcı kayıttır: eklenemezse işlem başarısız sayılmaz (denetim kaydı işlem günlüğündedir).
-    """
-    import time
-
-    from bulutbelge_core.rules import DATA_TYPES
-
-    try:
-        counts = result.get("counts") or {}
-        settings_mod.history_add(
-            {
-                "entry": {
-                    "path": source,
-                    "target": result["target"],
-                    "count": int(result.get("masked") or sum(counts.values())),
-                    "at": int(time.time() * 1000),
-                    "profileName": profile["name"],
-                    "byType": [
-                        {"type": k, "label": DATA_TYPES[k].label if k in DATA_TYPES else k, "count": n}
-                        for k, n in counts.items()
-                    ],
-                    "agent": agent or "ajan",
-                }
-            }
-        )
-    except Exception:  # noqa: BLE001 - yardımcı kayıt
-        pass
+    out.write(format_scan(summary))
 
 
 def _print_summary(summary: dict[str, Any], out) -> None:
-    out.write("--- BulutBelge özeti ---\n")
-    out.write(f"İşlem: {summary['islem']}\nKaynak: {summary['kaynak']}\n")
-    if summary["hedef"]:
-        out.write(f"Maskeli kopya: {summary['hedef']}\n")
-    out.write(f"Kural takımı: {summary['kural_takimi']}\nMaskelenen: {summary['maskelenen']}\n")
-    for label, n in summary["turler"].items():
-        out.write(f"  - {label}: {n}\n")
-    if summary["not"]:
-        out.write(f"Not: {summary['not']}\n")
-    for w in summary["uyarilar"]:
-        out.write(f"Uyarı: {w}\n")
+    from .ajan import format_summary
+
+    out.write(format_summary(summary))
 
 
-def run(argv: list[str], stdout, stderr) -> int:
+def run(argv: list[str], stdout, stderr, stdin=None) -> int:
+    # Ayrı bağlamda: çağıran bilgisi (journal.CALLER = ajan) aynı süreçteki sonraki işlemlere sızmasın.
+    return contextvars.copy_context().run(_run, argv, stdout, stderr, stdin)
+
+
+def ajan_valid(name: str) -> bool:
+    from .ajan import valid_agent_name
+
+    return valid_agent_name(name)
+
+
+def select_data_dir(flag: str | None, stderr) -> str | None:
+    """Politika klasörünü (ajan.json, settings.json, kasa, işlem günlüğü) seçer ve BULUTBELGE_DATA_DIR'e yazar.
+
+    Masaüstü uygulamasının klasörüdür; çağıran (ajan) bu klasörü seçemez (karar:
+    docs/kararlar/2026-11-21-ajan-cli-veri-klasoru.md). --veri-klasoru ve BULUTBELGE_DATA_DIR yalnızca
+    açık geliştirme/test modunda kabul edilir. Bayrak geliştirme modu dışında verildiyse None (kullanım hatası).
+    """
+    if dev_mode():
+        data = flag or os.environ.get("BULUTBELGE_DATA_DIR") or str(default_data_dir())
+    else:
+        if flag:
+            stderr.write(
+                "Hata [invalid_params]: --veri-klasoru yalnızca geliştirme modunda kullanılabilir "
+                f"({DEV_ENV}=1). Ajan komutu masaüstü uygulamasının ayarlarını kullanır.\n"
+            )
+            return None
+        data = str(default_data_dir())
+        given = os.environ.get("BULUTBELGE_DATA_DIR")
+        if given and Path(given) != Path(data):
+            stderr.write(
+                f"Uyarı: BULUTBELGE_DATA_DIR yok sayıldı (yalnızca {DEV_ENV}=1 ile geçerli); "
+                "masaüstü uygulamasının ayarları kullanılıyor.\n"
+            )
+    os.environ["BULUTBELGE_DATA_DIR"] = str(Path(data))
+    return data
+
+
+def _run(argv: list[str], stdout, stderr, stdin=None) -> int:
     try:
         args = _parser().parse_args(argv)
     except SystemExit as exc:
@@ -273,45 +294,38 @@ def run(argv: list[str], stdout, stderr) -> int:
         # Statik metin: ayar klasörü, izin ve işlem günlüğü gerektirmez (belgeye dokunmaz).
         from . import kilavuz
 
-        stdout.write(kilavuz.guide_prompt(kilavuz.command_here()) if args.yonerge else kilavuz.guide_text())
+        if args.skill:
+            stdout.write(kilavuz.skill_text(kilavuz.command_here()))
+        else:
+            stdout.write(kilavuz.guide_prompt(kilavuz.command_here()) if args.yonerge else kilavuz.guide_text())
         return EXIT_OK
 
     agent_name = getattr(args, "ajan", None)
-    if agent_name and not _AGENT_NAME.fullmatch(agent_name):
+    if agent_name and not ajan_valid(agent_name):
         stderr.write(
             "Hata [invalid_params]: --ajan yalnızca harf, rakam, nokta, alt çizgi ve tire içerebilir "
             "ve harf ya da rakamla başlamalıdır (ör. claude-code).\n"
         )
         return EXIT_USAGE
 
-    # Politika (ajan.json, settings.json, kasa, işlem günlüğü) masaüstü uygulamasının klasöründen
-    # okunur; çağıran (ajan) bu klasörü seçemez (karar: docs/kararlar/2026-11-21-ajan-cli-veri-klasoru.md).
-    # --veri-klasoru ve BULUTBELGE_DATA_DIR yalnızca açık geliştirme/test modunda kabul edilir.
-    if dev_mode():
-        data = args.veri_klasoru or os.environ.get("BULUTBELGE_DATA_DIR") or str(default_data_dir())
-    else:
-        if args.veri_klasoru:
-            stderr.write(
-                "Hata [invalid_params]: --veri-klasoru yalnızca geliştirme modunda kullanılabilir "
-                f"({DEV_ENV}=1). Ajan komutu masaüstü uygulamasının ayarlarını kullanır.\n"
-            )
-            return EXIT_USAGE
-        data = str(default_data_dir())
-        given = os.environ.get("BULUTBELGE_DATA_DIR")
-        if given and Path(given) != Path(data):
-            stderr.write(
-                f"Uyarı: BULUTBELGE_DATA_DIR yok sayıldı (yalnızca {DEV_ENV}=1 ile geçerli); "
-                "masaüstü uygulamasının ayarları kullanılıyor.\n"
-            )
-    os.environ["BULUTBELGE_DATA_DIR"] = str(Path(data))
+    if select_data_dir(args.veri_klasoru, stderr) is None:
+        return EXIT_USAGE
 
-    from . import commands, journal, settings
+    if args.command == "mcp":
+        from . import mcp
+
+        if stdout is sys.__stdout__ and stdin is None:
+            mcp.serve_stdio()
+        else:
+            mcp.serve(stdin if stdin is not None else sys.stdin, stdout)
+        return EXIT_OK
+
+    from . import ajan, journal
     from .protocol import EngineError
 
     try:
-        agent_cfg = settings.load_agent()
         if args.command == "folders":
-            info = {k: agent_cfg[k] for k in ("folders", "allow_write")}
+            info = ajan.folders()
             if args.json:
                 stdout.write(json.dumps(info, ensure_ascii=False) + "\n")
             else:
@@ -320,77 +334,28 @@ def run(argv: list[str], stdout, stderr) -> int:
             return EXIT_OK
 
         journal.CALLER.set(("ajan", (args.ajan or "ajan")[:60]))
-        source = str(Path(args.dosya).absolute())
-        op = "okuma" if args.command == "read" else "maskeleme"
-        profile = _profile(settings, args.profil, agent_cfg)
-        folders = agent_cfg["folders"]
-
-        def refuse(code: str, message: str) -> None:
-            journal.refuse(op, code, message, source=source, profile=profile["name"])
-
-        if not folders:
-            refuse("not_allowed", "Ajan için izinli klasör yok. BulutBelge › Ayarlar › Ajan erişimi bölümünden ekleyin.")
-        if not settings.agent_allows(source, folders):
-            refuse("not_allowed", "Dosya izinli klasörlerin dışında")
-        if settings.VAULT.path.exists() and not agent_cfg["allow_without_terms"]:
-            # Özel ifadeler şifreli kasada; ajan komutu kasayı açamaz. Kullanıcı açıkça izin vermedikçe
-            # özel ifadeleri (kişi, müşteri adları) uygulamadan okuma yapılmaz.
-            refuse(
-                "terms_unavailable",
-                "Özel ifade kasası var ama ajan komutu kasayı açamaz. Özel ifadeler olmadan çalışmasına "
-                "Ayarlar › Ajan erişimi bölümünden izin verin.",
-            )
-        rules = {**profile, "terms": [], "profile_name": profile["name"]}
-
-        if args.command == "read":
-            from bulutbelge_core.readout import read_masked
-
-            @commands._user_errors
-            def do_read(params: dict[str, Any]) -> dict[str, Any]:
-                r = read_masked(source, commands._rules(params))
-                return {"text": r.text, "format": r.format, "masked": r.masked, "counts": r.counts, "warnings": r.warnings}
-
-            result = journal.run(
-                "okuma",
-                lambda: do_read({"rules": rules}),
-                source=source,
-                profile=profile["name"],
-                counts_of=lambda r: r["counts"],
-            )
-            summary = _summary("okuma", source, profile, result, None)
+        if args.command == "scan":
+            summary = ajan.scan(args.dosya, args.profil)
             if args.json:
-                stdout.write(json.dumps({"ok": True, "text": result["text"], "summary": summary}, ensure_ascii=False) + "\n")
+                stdout.write(json.dumps({"ok": True, "summary": summary}, ensure_ascii=False) + "\n")
             else:
-                stdout.write(result["text"].rstrip("\n") + "\n\n")
-                _print_summary(summary, stdout)
+                _print_scan(summary, stdout)
             return EXIT_OK
 
-        # mask
-        if not agent_cfg["allow_write"]:
-            refuse("write_not_allowed", "Ajanın maskeli kopya yazmasına izin verilmemiş (Ayarlar › Ajan erişimi)")
-        from bulutbelge_core.pdf import default_target
+        if args.command == "read":
+            result = ajan.read(args.dosya, args.profil)
+            if args.json:
+                stdout.write(json.dumps({"ok": True, **result}, ensure_ascii=False) + "\n")
+            else:
+                stdout.write(result["text"].rstrip("\n") + "\n\n")
+                _print_summary(result["summary"], stdout)
+            return EXIT_OK
 
-        target = str(Path(args.hedef).absolute()) if args.hedef else default_target(source)
-        if not settings.agent_allows(target, folders):
-            refuse("not_allowed", "Hedef izinli klasörlerin dışında")
-        result = journal.run(
-            "maskeleme",
-            lambda: commands._doc_mask_checked({"source": source, "target": target, "rules": rules}),
-            source=source,
-            profile=profile["name"],
-            counts_of=lambda r: r.get("counts") or {},
-            target_of=lambda r: r["target"],
-        )
-        if not settings.agent_allows(result["target"], folders):
-            # Çekirdek yolu değiştirdiyse (uzantı, var olan dosya) yine izinli klasörde olmalı.
-            Path(result["target"]).unlink(missing_ok=True)
-            raise CliError("not_allowed", "Kopya izinli klasörün dışına düştü; silindi", EXIT_REFUSED)
-        summary = _summary("maskeleme", source, profile, result, result["target"])
-        _record_recent(settings, source, profile, result, args.ajan)
+        result = ajan.mask(args.dosya, args.hedef, args.profil, args.ajan)
         if args.json:
-            stdout.write(json.dumps({"ok": True, "summary": summary}, ensure_ascii=False) + "\n")
+            stdout.write(json.dumps({"ok": True, **result}, ensure_ascii=False) + "\n")
         else:
-            _print_summary(summary, stdout)
+            _print_summary(result["summary"], stdout)
         return EXIT_OK
     except CliError as exc:
         stderr.write(f"Hata ({exc.code}): {exc.message}\n")

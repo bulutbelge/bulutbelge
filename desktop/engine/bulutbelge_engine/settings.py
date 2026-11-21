@@ -829,6 +829,56 @@ def save_agent(params: dict[str, Any]) -> dict[str, Any]:
     return load_agent()
 
 
+def looser_than(wanted: dict[str, Any], ceiling: dict[str, Any]) -> list[str]:
+    """`wanted` kural takımı `ceiling`den hangi yönlerden gevşek (boşsa en az onun kadar sıkı).
+
+    Ajan için atanan takım üst sınırdır (K1): ceiling'de açık her veri türü wanted'da da açık olmalı
+    (yöntem farklı olabilir). Ayrıca ceiling'in açık özel kalıpları, sütun kuralları ve imza etiketleri
+    wanted'da da bulunmalı; wanted'ın beyaz listesi ve kurum sözlüğü ceiling'inkinden geniş olmamalı
+    (ikisi de bulguları maskelemeden bırakır). Dönen metinler değer içermez: tür adı ve sayı.
+    """
+    try:
+        w, c = Rules.from_dict(wanted), Rules.from_dict(ceiling)
+    except RuleError:
+        return ["kural takımı okunamadı"]
+    out = [DATA_TYPES[k].label for k, r in c.types.items() if r.enabled and not w.types[k].enabled]
+    patterns = {p.pattern for p in w.patterns if p.enabled}
+    missing = sum(1 for p in c.patterns if p.enabled and p.pattern not in patterns)
+    if missing:
+        out.append(f"{missing} özel kalıp yok")
+    if not set(w.whitelist) <= set(c.whitelist):
+        out.append("beyaz liste daha geniş")
+    if not set(w.institutions) <= set(c.institutions):
+        out.append("kurum sözlüğü daha geniş")
+    if any(w.column_rules.get(h) != t for h, t in c.column_rules.items()) or any(
+        w.column_actions.get(h) != a for h, a in c.column_actions.items()
+    ):
+        out.append("sütun kuralları eksik")
+    if c.types["imza"].enabled and not set(c.signature_labels) <= set(w.signature_labels):
+        out.append("imza etiketleri eksik")
+    return out
+
+
+def agent_profile(wanted: str | None, agent_cfg: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Ajan çağrısının kural takımı ve (varsa) atanan takımdan gevşek olduğu yönler.
+
+    Atanan takım (yoksa etkin takım) üst sınırdır; `wanted` yalnızca en az onun kadar sıkı bir takım
+    seçebilir. Bilinmeyen takım EngineError("invalid_params").
+    """
+    s = load_settings()
+    by_id = {p["id"]: p for p in s["profiles"]}
+    ceiling_id = agent_cfg.get("profile") or s["active"]
+    pid = wanted or ceiling_id
+    if pid not in by_id:
+        raise EngineError("invalid_params", f"Kural takımı bulunamadı: {pid}")
+    if ceiling_id not in by_id:
+        # Atanan takım silinmiş: hangi takımın üst sınır olduğu bilinmiyor (şüphede reddet).
+        raise EngineError("invalid_params", f"Ajan için atanan kural takımı bulunamadı: {ceiling_id}")
+    if pid == ceiling_id:
+        return by_id[pid], []
+    return by_id[pid], looser_than(by_id[pid], by_id[ceiling_id])
+
+
 def agent_allows(path: str | os.PathLike, folders: list[str]) -> bool:
     """Yol (sembolik bağlar çözülerek) izinli klasörlerden birinin içinde mi."""
     try:

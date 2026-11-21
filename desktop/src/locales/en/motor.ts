@@ -95,8 +95,18 @@ export default {
     "Leak detection: {n} {n:value|values} that should be masked can still be read in the output. The file was not written.",
 
   // Tarama uyarıları (office.py, pdf.py, textdoc.py, image.py)
-  "Belgede {n} görsel var. Görsellerdeki yazı ve yüzler taranmaz; gerekirse belgeyi PDF'e çevirip “Alan seç” ile maskeleyin.":
-    "The document has {n} {n:image|images}. Text and faces in images are not scanned; if needed, convert the document to PDF and mask them with “Select area”.",
+  "Belgede taranamayan {n} görsel var ({turler}): içlerindeki yazı ve yüzler taranmadı, maskeli kopyada olduğu gibi kalır. Kendiniz kontrol edin; gerekirse belgeyi PDF'e çevirip “Alan seç” ile maskeleyin.":
+    "The document has {n} {n:image|images} that cannot be scanned ({turler}): text and faces in them were not scanned and stay as they are in the masked copy. Check them yourself; if needed, convert the document to PDF and mask them with “Select area”.",
+  "Belgede {n} görsel var: UDF içindeki görseller taranmadı, maskeli kopyada olduğu gibi kalır. Kendiniz kontrol edin.":
+    "The document has {n} {n:image|images}: images inside a UDF file were not scanned and stay as they are in the masked copy. Check them yourself.",
+  "Belgede metin dışı başka dosyalar var; içleri taranmaz, maskeli kopyada olduğu gibi kalır.":
+    "The document has other non-text files; their contents are not scanned and stay as they are in the masked copy.",
+  "Belgede {n} grafik var. Grafikteki başlık, etiket ve önbellek değerleri de taranır; maskelenen sayı değerleri grafikte boş görünür.":
+    "The document has {n} {n:chart|charts}. Chart titles, labels and cached values are scanned too; masked numbers appear empty in the chart.",
+  "Çalışma kitabında {n} özet tablo (pivot) önbelleği var. Maskeli kopyada önbellek kayıtları silinir, önbellekteki değerler taranır; Excel tabloyu açılışta maskeli veriden yeniden oluşturur.":
+    "The workbook has {n} pivot table {n:cache|caches}. In the masked copy the cache records are removed and cached values are scanned; Excel rebuilds the pivot table from the masked data when the file is opened.",
+  "Belgedeki bir görselin meta verisi (EXIF) silinemedi. Dosya yazılmadı.":
+    "The metadata (EXIF) of an image in the document could not be removed. The file was not written.",
   "Excel'de tarih biçimli hücreler (doğum tarihi gibi) sayı olarak saklanır ve bu türde bulunamaz; gerekirse sütunu metin olarak kaydedin.":
     "Date-formatted cells in Excel (such as a date of birth) are stored as numbers and cannot be found as this type; if needed, save the column as text.",
   "Seçilen satır ve sütunlarda {n} hücre silindi. Bu hücrelere başvuran formüllerin son hesaplanan değerleri başka hücrelerde kalabilir; gerekirse o hücreleri de seçin.":
@@ -111,10 +121,18 @@ export default {
     "The image has a signature or stamp label. A signature in a scanned image cannot be found automatically; mark it in the preview with “Select area”.",
   "Sayfa {sayfalar}: imza ya da kaşe etiketi var. Taranmış görseldeki imza otomatik bulunamaz; önizlemede “Alan seç” ile işaretleyin.":
     "Page(s) {sayfalar}: there is a signature or stamp label. A signature in a scanned image cannot be found automatically; mark it in the preview with “Select area”.",
-  "Görselde metin katmanı yok ve OCR dil dosyaları kurulu değil. Otomatik tespit yapılamadı; maskelenecek yerleri “Alan seç” ile işaretleyin.":
-    "The image has no text layer and the OCR language files are not installed. Automatic detection could not be done; mark the places to mask with “Select area”.",
-  "Sayfa {sayfalar}: metin katmanı yok ve OCR dil dosyaları kurulu değil. Otomatik tespit yapılamadı; maskelenecek yerleri “Alan seç” ile işaretleyin.":
-    "Page(s) {sayfalar}: there is no text layer and the OCR language files are not installed. Automatic detection could not be done; mark the places to mask with “Select area”.",
+  "Görselde metin katmanı yok ve OCR dil dosyaları kurulu değil (kurulum bozuk olabilir). Otomatik tespit yapılamadı; bu sayfalar maskelenecekse maskeli kopya yazılmaz. BulutBelge'yi yeniden kurun.":
+    "The image has no text layer and the OCR language files are not installed (the installation may be broken). Automatic detection could not be done; no masked copy is written while these pages are to be masked. Reinstall BulutBelge.",
+  "Sayfa {sayfalar}: metin katmanı yok ve OCR dil dosyaları kurulu değil (kurulum bozuk olabilir). Otomatik tespit yapılamadı; bu sayfalar maskelenecekse maskeli kopya yazılmaz. BulutBelge'yi yeniden kurun.":
+    "Page(s) {sayfalar}: there is no text layer and the OCR language files are not installed (the installation may be broken). Automatic detection could not be done; no masked copy is written while these pages are to be masked. Reinstall BulutBelge.",
+  "Belgedeki görsellerde yazı okunamadı (OCR dil dosyaları kurulu değil); yalnızca yüz tarandı. OCR kullanılamadan maskeli kopya yazılmaz; BulutBelge'yi yeniden kurun.":
+    "Text in the document's images could not be read (OCR language files are not installed); only faces were scanned. No masked copy is written without OCR; reinstall BulutBelge.",
+  "OCR kullanılamıyor (kurulum bozuk olabilir): Görselin metin katmanı yok ve OCR yapılamadığı için içindeki kişisel veri bulunamıyor. Maskeleme yapılmadı, dosya yazılmadı. BulutBelge'yi yeniden kurun.":
+    "OCR is not available (the installation may be broken): the image has no text layer and, without OCR, personal data in it cannot be found. Nothing was masked and the file was not written. Reinstall BulutBelge.",
+  "OCR kullanılamıyor (kurulum bozuk olabilir): Sayfa {sayfalar}: metin katmanı yok ve OCR yapılamadığı için içindeki kişisel veri bulunamıyor. Maskeleme yapılmadı, dosya yazılmadı. BulutBelge'yi yeniden kurun.":
+    "OCR is not available (the installation may be broken): page(s) {sayfalar} have no text layer and, without OCR, personal data on them cannot be found. Nothing was masked and the file was not written. Reinstall BulutBelge.",
+  "OCR kullanılamıyor (kurulum bozuk olabilir): belgedeki {n} görselin metin katmanı yok ve OCR yapılamadığı için içindeki kişisel veri bulunamıyor. Maskeleme yapılmadı, dosya yazılmadı. BulutBelge'yi yeniden kurun.":
+    "OCR is not available (the installation may be broken): {n} {n:image|images} in the document have no text layer and, without OCR, personal data in them cannot be found. Nothing was masked and the file was not written. Reinstall BulutBelge.",
 
   // Rust kabuğunun motor köprüsü hataları (src-tauri/src/engine.rs): arayüze aynı yoldan ulaşır
   "kilit hatası": "lock error",

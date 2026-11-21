@@ -57,6 +57,20 @@ class PdfError(Exception):
     """Kullanıcıya gösterilecek PDF hatası."""
 
 
+class OcrUnavailable(PdfError):
+    """Metin katmanı olmayan sayfa ya da görsel var ama OCR yapılamıyor: maskeleme reddedilir (K3).
+
+    OCR normalde pakettedir; yoksa kurulum bozuktur. Sayfa maskesiz kalırdı, bu yüzden dosya yazılmaz.
+    """
+
+
+def ocr_refusal(where: str) -> str:
+    return (
+        f"OCR kullanılamıyor (kurulum bozuk olabilir): {where} metin katmanı yok ve OCR yapılamadığı için "
+        "içindeki kişisel veri bulunamıyor. Maskeleme yapılmadı, dosya yazılmadı. BulutBelge'yi yeniden kurun."
+    )
+
+
 @dataclass
 class PdfFinding:
     id: str
@@ -82,6 +96,8 @@ class ScanResult:
     warnings: list[str] = field(default_factory=list)
     # OCR ile okunan sayfalar (1'den başlar). Bu sayfalarda kaçak kontrolü de OCR ile yapılır.
     ocr_pages: list[int] = field(default_factory=list)
+    # Metin katmanı olmayan (ya da taranmış görsel bölgesi olan) ve OCR yapılamayan sayfalar (1'den).
+    no_ocr_pages: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -559,11 +575,14 @@ def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image
     if no_ocr_pages:
         where = "Görselde" if image else f"Sayfa {', '.join(map(str, no_ocr_pages))}:"
         warnings.append(
-            f"{where} metin katmanı yok ve OCR dil dosyaları kurulu değil. "
-            "Otomatik tespit yapılamadı; maskelenecek yerleri “Alan seç” ile işaretleyin."
+            f"{where} metin katmanı yok ve OCR dil dosyaları kurulu değil (kurulum bozuk olabilir). "
+            "Otomatik tespit yapılamadı; bu sayfalar maskelenecekse maskeli kopya yazılmaz. BulutBelge'yi yeniden kurun."
         )
     findings = _gorsel_tekrarlarini_ele(findings)
-    return ScanResult(pages=doc.page_count, findings=findings, warnings=warnings, ocr_pages=ocr_pages)
+    return ScanResult(
+        pages=doc.page_count, findings=findings, warnings=warnings, ocr_pages=ocr_pages,
+        no_ocr_pages=sorted(set(no_ocr_pages)),
+    )
 
 
 def scan_pdf(path: str | os.PathLike, rules: Rules, previews: bool = False, flatten: bool = False) -> ScanResult:
@@ -744,6 +763,7 @@ def mask_pdf(
     mask_pages: str | list[int] | None = None,
     exclude_pages: str | list[int] | None = None,
     strip_bookmarks: bool = True,
+    require_ocr: bool = True,
 ) -> MaskResult:
     """Kaynağı tarar, dışlananlar dışındaki bulguları siler, sonucu hedefe yazar.
 
@@ -764,6 +784,10 @@ def mask_pdf(
     `mask_pages`: yalnız bu sayfalar maskelenir ("4-6", "1, 4-5, 7", "tek", "cift"; ya da sayı listesi); diğer
     sayfalar olduğu gibi kalır. `exclude_pages`: bu sayfalar maskelenmez (önce `mask_pages` uygulanır).
     `strip_bookmarks`: yer imleri (başlıklar kişisel veri taşıyabilir) kopyadan silinir; False ile korunur.
+
+    `require_ocr`: metin katmanı olmayan ve OCR yapılamayan bir sayfa (ya da görsel) maskelenecekse
+    OcrUnavailable (dosya yazılmaz). Yalnızca maskeli okuma (readout) False verir: orada kopya diske kalmaz
+    ve okunamayan sayfanın içeriği çıktıya zaten girmez.
 
     `flatten`: yüksek riskli belge için; her sayfa görüntüye çevrilip yeniden OCR ile okunur ve
     maskelenir. Metin katmanı, gizli metin, açıklama ve ekler kopyaya hiç geçmez.
@@ -811,10 +835,16 @@ def mask_pdf(
         scan = _scan_doc(doc, rules, image=image)
         scan.warnings = flatten_warnings + scan.warnings
         n_pages = doc.page_count
+        active = set(range(1, n_pages + 1))
         if mask_pages or exclude_pages:
-            active = set(parse_page_spec(mask_pages, n_pages)) if mask_pages else set(range(1, n_pages + 1))
+            active = set(parse_page_spec(mask_pages, n_pages)) if mask_pages else active
             active -= set(parse_page_spec(exclude_pages, n_pages))
             excluded_ids = excluded_ids | {f.id for f in scan.findings if f.page not in active}
+        # K3: OCR yapılamayan sayfa sessizce maskesiz yazılmaz. Kullanıcının maskelenmesin dediği ya da
+        # kopyadan çıkardığı sayfa hariç.
+        unreadable = sorted(set(scan.no_ocr_pages) & active - set(drop))
+        if unreadable and require_ocr:
+            raise OcrUnavailable(ocr_refusal("Görselin" if image else f"Sayfa {', '.join(map(str, unreadable))}:"))
         scan.findings.extend(_manual_findings(doc, rules, manual_areas or []))
         included = [f for f in scan.findings if f.id not in excluded_ids]
         unlocated = [f for f in included if not f.locatable]

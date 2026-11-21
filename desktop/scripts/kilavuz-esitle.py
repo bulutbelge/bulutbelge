@@ -111,7 +111,7 @@ def build_html(md: str) -> str:
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top"><div class="wrap"><a class="logo" href="./">Bulut<span>Belge</span></a><nav><a href="./">Ana sayfa</a> · <a href="ajan.md">Düz metin (ajanlar için)</a></nav></div></header>
+<header class="top"><div class="wrap"><a class="logo" href="./"><img class="logo-resim" src="logo.svg" alt="BulutBelge" width="119" height="24"></a><nav><a href="./">Ana sayfa</a> · <a href="ajan.md">Düz metin (ajanlar için)</a></nav></div></header>
 <main><div class="wrap page">
 <!-- Bu sayfa docs/AJAN-KOMUT-SATIRI.md'den desktop/scripts/kilavuz-esitle.py ile üretilir; elle düzenlemeyin. -->
 {body}

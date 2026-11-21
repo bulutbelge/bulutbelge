@@ -134,3 +134,33 @@ def test_help_does_not_change_exit_codes(capsys):
     assert run_cli("--help")[0] == 0
     assert run_cli("read")[0] == 2  # dosya yok: kullanım hatası
     assert run_cli("yok")[0] == 2
+
+
+def test_prompt_tells_agent_to_scan_first_and_suggest_masked_read():
+    prompt = kilavuz.guide_prompt()
+    assert "bulutbelge scan" in prompt
+    for needle in ("ilk adım bulutbelge scan", "maskeli okumayı (read) öner", "onay verdiğinde", "zorlama"):
+        assert needle in prompt, needle
+
+
+def test_kilavuz_skill_prints_claude_code_skill():
+    code, out, _ = run_cli("kilavuz", "--skill")
+    assert code == 0 and out == kilavuz.skill_text(kilavuz.command_here())
+    head = kilavuz.skill_text().split("---")[1]
+    assert "\nname: bulutbelge\n" in head and "\ndescription: " in head
+    body = kilavuz.skill_text()
+    for needle in ("bulutbelge scan", "bulutbelge read", "bulutbelge mask", "bulutbelge folders", "Çıkış kodları", "Örnek akış"):
+        assert needle in body, needle
+    for code_ in cli.EXIT_CODES:
+        assert f"| {code_} |" in body
+    assert run_cli("kilavuz", "--skill", "--yonerge")[0] == 2
+    assert not (settings.data_dir() / "islem-gunlugu.jsonl").exists()
+
+
+def test_skill_uses_the_real_command_and_is_packaged():
+    text = kilavuz.skill_text('"C:\\Program Files\\BulutBelge\\engine\\bulutbelge-engine.exe"')
+    assert '"C:\\Program Files\\BulutBelge\\engine\\bulutbelge-engine.exe" scan "<dosya>"' in text
+    assert "name: bulutbelge\n" in text  # ön bilgi değişmez
+    engine = ROOT / "desktop" / "engine"
+    assert '"skill/SKILL.md"' in (engine / "pyproject.toml").read_text(encoding="utf-8")
+    assert "'skill' / 'SKILL.md'" in (engine / "build.py").read_text(encoding="utf-8")

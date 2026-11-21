@@ -6,7 +6,9 @@ okuma çıktısı, kullanıcının kaydedeceği maskeli kopyada olmayan hiçbir 
 taşımaz. Geçici klasör işlem bitince silinir; orijinal değer bellekte kalır.
 
 Sınırlar: taranmış sayfa ve fotoğrafın metin katmanı yoktur, çıktıda yalnızca
-not olarak geçer (OCR ile okunup maskelenmiş görüntü yeniden okunmaz).
+not olarak geçer (OCR ile okunup maskelenmiş görüntü yeniden okunmaz). Bu yüzden
+OCR kullanılamadığında maskeleme (mask) reddedilir ama okuma uyarıyla sürer
+(K3): okunamayan sayfanın içeriği çıktıya zaten girmez.
 """
 
 from __future__ import annotations
@@ -72,7 +74,7 @@ def _office_text(path: Path, fmt: office.OfficeFormat) -> str:
         for name in sorted(z.namelist(), key=office._reading_order(fmt)):
             if not fmt.text_parts.match(name):
                 continue
-            lines = [office.unit_text(s) for _u, s in office.units(fmt, office.parse(z.read(name)))]
+            lines = [office.unit_text(s) for _u, s in office.units(office.part_format(fmt, name), office.parse(z.read(name)))]
             lines = [x for x in lines if x.strip()]
             if lines:
                 out.append(f"--- {name} ---")
@@ -101,10 +103,11 @@ def read_masked(source: str | os.PathLike, rules: Rules) -> MaskedRead:
         elif kind in ("word", "sunum", "tablo"):
             fmt = office.format_of(src)
             assert fmt is not None
-            out, masked, warnings = office.mask(src, target, fmt, rules, counts=counts)
+            # Okumada OCR'sız görsel reddedilmez: kopya diske kalmaz, görsel içeriği metin çıktısına girmez.
+            out, masked, warnings = office.mask(src, target, fmt, rules, counts=counts, require_ocr=False)
             text, notes = _office_text(Path(out), fmt), []
         else:
-            result = mask_pdf(src, target, rules, counts=counts)
+            result = mask_pdf(src, target, rules, counts=counts, require_ocr=False)
             out, masked, warnings = result.target, result.masked, result.warnings
             text, notes = _pdf_text(Path(out), kind == "gorsel")
     finally:

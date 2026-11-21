@@ -1,26 +1,28 @@
 # BulutBelge komut satırı kılavuzu (insanlar ve yapay zekâ ajanları için)
 
-BulutBelge'yi terminalden kullanmak için: bir belgenin **maskeli metnini okumak** ve **maskeli kopyasını yazmak**. Claude Code, Codex, Gemini CLI, Cursor gibi kabuk çalıştırabilen her ajan ya da bir betik kullanabilir. Orijinal değerler ajana hiç ulaşmaz; yalnızca maskeli çıktı döner.
+BulutBelge'yi terminalden kullanmak için: bir belgede **kaç kişisel veri olduğuna bakmak** (değer göstermeden), belgenin **maskeli metnini okumak** ve **maskeli kopyasını yazmak**. Claude Code, Codex, Gemini CLI, Cursor gibi kabuk çalıştırabilen her ajan ya da bir betik kullanabilir. Orijinal değerler ajana hiç ulaşmaz; yalnızca maskeli çıktı döner.
 
-Yerel API ve MCP yoktur, yalnızca bu komut satırı (karar: `docs/kararlar/2026-11-05-ajan-yerel-kullanim.md`). Bu kılavuz uygulamanın içinde de gelir: `bulutbelge kilavuz`.
+Yerel API yoktur (karar: `docs/kararlar/2026-11-05-ajan-yerel-kullanim.md`). Aynı işlemleri aynı kurallarla sunan yerel bir MCP sunucusu vardır: `bulutbelge mcp`, yalnızca standart giriş/çıkış (stdio) üzerinden, ağ portu açmaz (aşağıda "MCP sunucusu"; karar: `docs/kararlar/2026-11-21-ajan-mcp-stdio.md`). Bu kılavuz uygulamanın içinde de gelir: `bulutbelge kilavuz`.
 
 ## Kısaca
 
 | | |
 |---|---|
-| Ne yapar | Belgeyi **gerçekten maskeler** (görsel örtü değil, silme), maskeli metni ya da maskeli kopyayı verir |
+| Ne yapar | Belgeyi **gerçekten maskeler** (görsel örtü değil, silme), maskeli metni ya da maskeli kopyayı verir; `scan` yalnızca bulgu sayılarını verir |
 | Biçimler | PDF, görsel (JPG/PNG/TIFF/BMP/WEBP), Word, Excel, PowerPoint, XML/TXT/CSV |
 | Ne zaman çalışır | Kullanıcı önce **izin verdiyse** (aşağıda "Bir kez yapılacak ayar") |
 | Ne yapmaz | Maskeyi kaldırmaz, kasayı açmaz, mevcut dosyanın üzerine yazmaz, izinli klasör dışına çıkmaz |
 | Denetim | Her çağrı (reddedilenler dahil) hash zincirli işlem günlüğüne "Ajan" olarak yazılır |
+| MCP | `bulutbelge mcp`: yerel, yalnızca stdio; araçlar komutlarla aynı izin ve günlüğü kullanır |
 
 ## Hızlı başlangıç
 
 1. **Kullanıcı** (bir kez): BulutBelge › Ayarlar › **Ajan erişimi** › klasörü ekle; kopya yazılacaksa **Maskeli kopya yazabilsin** anahtarını aç.
-2. **Ajan/terminal**: izinleri gör, oku, kopya yaz:
+2. **Ajan/terminal**: izinleri gör, bak (yalnızca sayılar), oku, kopya yaz:
 
 ```
 bulutbelge folders
+bulutbelge scan  "C:\Belgeler\basvuru.pdf" --ajan claude-code
 bulutbelge read  "C:\Belgeler\basvuru.pdf" --ajan claude-code
 bulutbelge mask  "C:\Belgeler\basvuru.pdf" --ajan claude-code
 ```
@@ -36,7 +38,7 @@ Ajan, bu ayar yapılmadan hiçbir dosyayı okuyamaz. Ayar uygulamanın **Ayarlar
 1. **İzinli klasörler.** Ajanın çalışacağı klasörleri ekleyin. Sürücünün tamamı, kullanıcı klasörünün tamamı ve uygulamanın ayar klasörü eklenemez. Maskeli kopyaların yazılacağı klasör de listede olmalıdır.
 2. **Maskeli kopya yazabilsin.** `mask` komutu için gerekir. Yazılan her şey yeni dosyadır; var olan dosyanın ve kaynak belgenin üzerine yazılmaz.
 3. **Özel ifade kasası** kullanıyorsanız: komut kasayı açamaz, bu yüzden kasadaki kişi/müşteri/proje adları ajan çıktısında **maskelenmez**. Kabul ediyorsanız **Özel ifadeler olmadan çalışabilsin** anahtarını açın; kapalıyken ajan hiç çalışmaz. Takma ad yöntemi kullanan kural takımı ajanla kullanılamaz.
-4. İsterseniz ajan için ayrı bir **kural takımı** seçin (varsayılan: Ayarlar'da şu an kullanılan).
+4. İsterseniz ajan için ayrı bir **kural takımı** seçin (varsayılan: Ayarlar'da şu an kullanılan). Bu takım ajan için **üst sınırdır**: ajan `--profil` ile yalnızca bu takımı ya da ondan sıkı bir takımı seçebilir; daha gevşek bir takım (ör. adları açık bırakan "Kurum içine") reddedilir.
 5. İşiniz bitince klasörleri kaldırabilir, yazma anahtarını kapatabilirsiniz.
 
 Ayarlar'daki **Ajan yönergesini kopyala** düğmesi aşağıdaki hazır yönergeyi panoya alır.
@@ -62,14 +64,30 @@ Ayar klasörü her zaman masaüstü uygulamasının klasörüdür (Windows `%APP
 
 | Komut | Ne yapar |
 |---|---|
+| `scan <dosya> [--profil ID] [--ajan AD] [--json]` | Belgeyi **değiştirmeden** tarar; **değer göstermez**: veri türüne göre bulgu sayıları, sayfa sayısı ve uyarılar. İzin modeli `read` ile aynıdır, günlüğe "okuma" olarak girer. Kişisel veri içerebilecek bir belgede ilk adım budur. |
 | `read <dosya> [--profil ID] [--ajan AD] [--json]` | Belgenin **maskeli metnini** yazdırır, sonda özet. Belge önce gerçekten maskelenir (geçici kopya, kaçak denetimiyle), metin o kopyadan çıkarılır; geçici kopya silinir. |
 | `mask <dosya> [--hedef YOL] [--profil ID] [--ajan AD] [--json]` | Maskeli kopyayı **yeni dosyaya** yazar (varsayılan: kaynağın yanında `_maskeli`). Hedef de izinli klasörde olmalıdır. |
 | `folders [--json]` | İzinli klasörleri ve yazma iznini gösterir. İlk çağrı olarak iyi bir denetimdir. |
-| `kilavuz [--yonerge]` | Bu kılavuzu (ya da yalnızca hazır yönergeyi) yazdırır. İzin ya da ayar gerektirmez, günlüğe girmez. |
+| `mcp` | Yerel MCP sunucusunu başlatır (yalnızca stdio, ağ portu açmaz). Ajan aracı bunu alt süreç olarak çalıştırır; elle çalıştırmanız gerekmez. Aşağıda "MCP sunucusu". |
+| `kilavuz [--yonerge] [--skill]` | Bu kılavuzu, yalnızca hazır yönergeyi (`--yonerge`) ya da Claude Code beceri dosyasını (`--skill`) yazdırır. İzin ya da ayar gerektirmez, günlüğe girmez. |
 
-Ortak seçenekler: `--ajan AD` günlüğe yazılacak ajan adı (örn. `claude-code`; yalnızca harf, rakam, `.`, `_`, `-`, harf ya da rakamla başlar, aksi hâlde çıkış kodu 2); `--profil ID` kural takımı; `--json` makine okunur çıktı.
+Ortak seçenekler: `--ajan AD` günlüğe yazılacak ajan adı (örn. `claude-code`; yalnızca harf, rakam, `.`, `_`, `-`, harf ya da rakamla başlar, aksi hâlde çıkış kodu 2); `--profil ID` kural takımı (yalnızca ajan için atanan takım ya da ondan sıkısı: atanan takımda maskelenen her veri türünü maskeleyen, beyaz listesi daha geniş olmayan; aksi hâlde çıkış kodu 3); `--json` makine okunur çıktı.
 
 ### Örnek çıktılar (sahte veri)
+
+`scan` (metin biçimi):
+
+```
+--- BulutBelge tarama özeti ---
+Kaynak: C:\Belgeler\basvuru.pdf
+Kural takımı: Varsayılan
+Sayfa: 2
+Bulunan: 3
+  - Kişi adı: 1
+  - TC kimlik no: 1
+  - E-posta: 1
+Belge değiştirilmedi, değerler gösterilmez. Maskeli metin için: bulutbelge read
+```
 
 `read` (metin biçimi):
 
@@ -101,9 +119,9 @@ Maskelenen: 3
 | Kod | Anlamı | Ajan ne yapmalı |
 |---|---|---|
 | 0 | Başarılı | Devam et |
-| 1 | Belge ya da işlem hatası (bozuk dosya, desteklenmeyen biçim, **kaçak denetimi**) | Hata mesajını kullanıcıya ilet; dosyayı başka yoldan okuma |
+| 1 | Belge ya da işlem hatası (bozuk dosya, desteklenmeyen biçim, **kaçak denetimi**, OCR kullanılamıyor) | Hata mesajını kullanıcıya ilet; dosyayı başka yoldan okuma |
 | 2 | Kullanım hatası (yanlış argüman, kural takımı yok) | Komutu düzelt |
-| 3 | İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu | **Dur**, mesajı aynen ilet; izni aşmaya çalışma |
+| 3 | İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu, atanandan gevşek kural takımı | **Dur**, mesajı aynen ilet; izni aşmaya çalışma |
 | 4 | İşlem günlüğü yazılamıyor; güvenlik için işlem yapılmadı | **Dur**, kullanıcıya bildir |
 
 ### Sık görülenler
@@ -111,10 +129,51 @@ Maskelenen: 3
 | Mesaj / durum | Anlamı ve çözüm |
 |---|---|
 | Çıkış 3, "izinli klasör yok" | Kullanıcı Ayarlar › Ajan erişimi'nde klasör eklememiş. Kullanıcıdan isteyin. |
+| Çıkış 3, "kural takımı, ajan için atanan takımdan gevşek" | `--profil` ile seçilen takım, atanan takımın maskelediği bir türü açık bırakıyor. `--profil` vermeyin (atanan takım kullanılır) ya da daha sıkı bir takım seçin. |
 | Çıkış 3, hedef izinli klasör dışında | `--hedef` yolu izinli klasörlerin altında olmalı (ya da kullanıcı hedef klasörü de eklemeli). |
 | "Kaçak tespiti: maskelenmesi gereken N değer çıktıda hâlâ okunuyor. Dosya yazılmadı." | Güvenlik denetimi çıktıda silinmemiş bir değer buldu; **dosya yazılmaz**. Bu bir hata değil korumadır. Belgede başka yerde geçen aynı değer ya da web adresi olabilir; kullanıcı uygulamada elle kontrol etsin. |
 | Uyarı: "Taranmış 1 sayfa OCR ile okundu…" | Metin katmanı olmayan sayfa OCR ile okundu; OCR hata yapabilir. Çıktıyı kontrol edin. |
-| Uyarı: "metin katmanı yok ve OCR dil dosyaları kurulu değil" | Taranmış sayfa **okunamadı**, içindeki kişisel veri maskelenmemiş olabilir; çıktıya güvenmeyin. `BULUTBELGE_TESSDATA` ayarlayın ya da uygulamada "Alan seç" ile elle işaretleyin. |
+| Uyarı: "metin katmanı yok ve OCR dil dosyaları kurulu değil" (`read`) | Taranmış sayfa **okunamadı**; içeriği okuma çıktısında yer almaz, içindeki veri hakkında bir şey bilinmez. Kurulum bozuk olabilir: kullanıcıya bildirin (geliştirmede `BULUTBELGE_TESSDATA` ayarlayın). |
+| Çıkış 1, `Hata (ocr_unavailable): OCR kullanılamıyor …` (`mask`) | Metin katmanı olmayan sayfa ya da görsel var ve OCR yapılamıyor; maskesiz kalacağı için **dosya yazılmadı**. Durun, kullanıcıya bildirin; uygulamanın yeniden kurulması gerekir. |
+
+## MCP sunucusu (yerel, yalnızca stdio)
+
+`bulutbelge mcp`, ajan aracının alt süreç olarak başlattığı bir MCP sunucusudur (protokol sürümü 2025-06-18). Ağ portu açmaz, hiçbir sunucuya bağlanmaz. Araçlar komutlarla **aynı** izinli klasör ve yazma izni denetimini, kural takımı üst sınırını ve işlem günlüğünü kullanır; ajana orijinal değer dönmez. Ajana kabuk izni vermeden kullanılabildiği için, ajan aracında belgelerin bulunduğu klasörlere doğrudan okuma izni vermemek kolaylaşır.
+
+| Araç | Komut karşılığı | Döner |
+|---|---|---|
+| `bulutbelge_folders` | `folders` | İzinli klasörler ve yazma izni |
+| `bulutbelge_scan` | `scan` | Yalnızca sayılar (veri türüne göre bulgu, sayfa, uyarı) |
+| `bulutbelge_read` | `read` | Maskeli metin ve özet |
+| `bulutbelge_mask` | `mask` | Özet; maskeli kopya yeni dosyaya yazılır (yazma izni gerekir) |
+
+Araç girdileri: `path` (zorunlu, `folders` dışında), `profile` (isteğe bağlı), `target` (yalnızca `mask`). Sonuç metin ve `structuredContent` olarak döner (`--json` çıktısıyla aynı alanlar). Hata olursa sonuç `isError: true` olur; `structuredContent` içinde `code`, `message` ve `exit_code` (yukarıdaki çıkış kodlarıyla aynı anlam) bulunur.
+
+Ajan adı (işlem günlüğüne girer): yapılandırmadaki `BULUTBELGE_AJAN` ortam değişkeni, yoksa ajan aracının kendini tanıttığı ad; ikisi de `--ajan` kuralına göre temizlenir.
+
+**Claude Code:**
+
+```
+claude mcp add bulutbelge -- bulutbelge mcp
+```
+
+Komut PATH'te değilse tam yolu yazın, ör. `claude mcp add bulutbelge -- "C:\Program Files\BulutBelge\engine\bulutbelge-engine.exe" mcp` (bu kurulumdaki yol: `bulutbelge kilavuz --yonerge` çıktısındaki komut).
+
+**Cursor** (`~/.cursor/mcp.json` ya da projede `.cursor/mcp.json`):
+
+```json
+{"mcpServers": {"bulutbelge": {"command": "bulutbelge", "args": ["mcp"], "env": {"BULUTBELGE_AJAN": "cursor"}}}}
+```
+
+**Genel stdio yapılandırması** (Codex, Gemini CLI, Claude Desktop ve diğerleri): komut `bulutbelge` (ya da motorun tam yolu), argüman `mcp`, isteğe bağlı ortam değişkeni `BULUTBELGE_AJAN`. Örnek, Codex `~/.codex/config.toml`:
+
+```
+[mcp_servers.bulutbelge]
+command = "bulutbelge"
+args = ["mcp"]
+```
+
+JSON yapılandırmalarında Windows yolundaki ters eğik çizgiler ikilenir (`"C:\\Program Files\\..."`). `BULUTBELGE_GELISTIRME` değişkenini MCP yapılandırmasına eklemeyin (ayar klasörü yalnızca geliştirmede değişebilir).
 
 ## JSON çıktı şeması
 
@@ -161,6 +220,28 @@ Maskelenen: 3
 
 `mask --json` örneği yukarıda "Örnek çıktılar" bölümündedir.
 
+`scan --json`: `ok` (boolean, başarıda `true`) ve `summary` (tarama özeti; değer ve metin yoktur).
+
+`scan --json` `summary` nesnesi (değer yok, yalnızca sayılar):
+
+| Alan | Tür | Açıklama |
+|---|---|---|
+| `islem` | string | "tarama" |
+| `kaynak` | string | Kaynak belgenin mutlak yolu |
+| `kural_takimi` | string | Kullanılan kural takımının adı |
+| `bulunan` | integer | Bulunan değer sayısı (maskelenmez, gösterilmez) |
+| `turler` | object (string → integer) | Veri türü adına göre bulunan sayı |
+| `sayfa` | integer | Sayfa sayısı (PDF/görsel sayfa, sunum slayt, arşiv dosya; diğerleri 1) |
+| `uyarilar` | array of string | Uyarılar (ör. OCR, özel nitelikli veri ipucu); yoksa boş liste |
+
+`scan --json` örneği (sahte veri):
+
+```json
+{"ok": true, "summary": {"islem": "tarama", "kaynak": "C:\\Belgeler\\ornek_basvuru.pdf",
+ "kural_takimi": "Varsayılan", "bulunan": 3, "turler": {"Kişi adı": 1, "TC kimlik no": 1, "E-posta": 1},
+ "sayfa": 2, "uyarilar": []}}
+```
+
 ## Güvenlik modeli
 
 BulutBelge'nin **kodda zorladığı** kurallar (ajan aşamaz):
@@ -176,17 +257,43 @@ Maskeleme %100 doğru değildir: bir bilgiyi kaçırabilir ya da gerekenden fazl
 
 ## Ajana verilecek hazır yönerge
 
-Aşağıdaki metni ajanın talimat dosyasına ekleyin: Claude Code için `CLAUDE.md`, Codex/Cursor/diğerleri için `AGENTS.md` ya da sistem yönergesi. Komut yolunu kurulumunuza göre düzeltin. Aynı metin `bulutbelge kilavuz --yonerge` ile de alınır.
+Aşağıdaki metni ajanın talimat dosyasına ekleyin: Claude Code için `CLAUDE.md` (ya da aşağıdaki beceri), Codex/Cursor/Gemini CLI ve diğerleri için `AGENTS.md` ya da sistem yönergesi. Komut yolunu kurulumunuza göre düzeltin. Aynı metin `bulutbelge kilavuz --yonerge` ile de alınır (komut yolu bu kuruluma göre yazılır).
+
+### Cursor, Codex, Gemini CLI: `AGENTS.md` parçası
+
+Projenin kökündeki `AGENTS.md` dosyasına (Gemini CLI için `GEMINI.md`) aşağıdaki yönergeyi ekleyin. Terminalden:
+
+```
+bulutbelge kilavuz --yonerge >> AGENTS.md
+```
+
+Windows PowerShell 5.1'de `>>` dosyayı UTF-16 yazar; bunun yerine `cmd /c "bulutbelge kilavuz --yonerge >> AGENTS.md"` kullanın.
+
+### Claude Code becerisi (skill)
+
+BulutBelge, Claude Code için hazır bir beceri dosyasıyla gelir: ne zaman kullanılacağı, komutlar, çıkış kodları ve örnek akış. Claude Code kişisel veri içerebilecek bir belgeyle çalışırken beceriyi kendisi seçer; önce `scan` ile bakar ve size maskeli okumayı önerir. Kurulum (kullanıcının tüm projeleri için):
+
+```
+mkdir -p ~/.claude/skills/bulutbelge
+bulutbelge kilavuz --skill > ~/.claude/skills/bulutbelge/SKILL.md
+```
+
+Windows: `mkdir %USERPROFILE%\.claude\skills\bulutbelge` ve `cmd /c "bulutbelge kilavuz --skill > %USERPROFILE%\.claude\skills\bulutbelge\SKILL.md"`. Yalnızca bir proje için `.claude/skills/bulutbelge/SKILL.md` yoluna yazın. Beceri yalnızca öneri sunar; kullanıcı onayı olmadan maskeli kopya yazmaz.
+
+### Yönerge metni
 
 <!-- yonerge-basla -->
 ```markdown
-## Yerel belgeler: yalnızca BulutBelge ile oku
+## Yerel belgeler: önce BulutBelge ile bak
 
-Kişisel veri içerebilecek yerel belgeleri (PDF, Word, Excel, PowerPoint, XML, CSV, JSON, TXT, LOG, görsel)
-doğrudan açma, okuma ya da içeriklerini kopyalama. Her zaman BulutBelge komutunu kullan.
+Kişisel veri içerebilecek yerel belgelerle (sözleşme, dilekçe, bordro, fatura, kimlik, CV, başvuru vb.;
+PDF, Word, Excel, PowerPoint, XML, CSV, JSON, TXT, LOG, görsel) çalışırken dosyayı kabukla doğrudan açma,
+okuma ya da içeriğini kopyalama. Önce BulutBelge ile değer göstermeden bak, kullanıcıya maskeli okumayı öner.
 (Komut PATH'te değilse tam yolunu yaz; örn. bulutbelge-engine ya da python -m bulutbelge_engine.cli.)
 
 - İzinler:        bulutbelge folders
+- Bakma:          bulutbelge scan "<dosya>" --ajan <ajan-adın>
+  Değer göstermez: veri türüne göre bulgu sayıları, sayfa sayısı ve uyarılar. Belge değişmez.
 - Okuma:          bulutbelge read "<dosya>" --ajan <ajan-adın>
   Çıktı belgenin maskeli metnidir; sonda "--- BulutBelge özeti ---" bölümü vardır.
   Makine okunur çıktı için --json ekle: {"ok": true, "text": "...", "summary": {...}}.
@@ -194,13 +301,18 @@ doğrudan açma, okuma ya da içeriklerini kopyalama. Her zaman BulutBelge komut
   Kaynak belgeye dokunulmaz, var olan dosyanın üzerine yazılmaz. Hedef izinli klasörde olmalı.
 
 Kurallar:
+- Kişisel veri içerebilecek bir belgede ilk adım bulutbelge scan: bulgu varsa kullanıcıya kaç tane ve
+  hangi türde olduğunu söyle, maskeli okumayı (read) öner. Kullanıcı açıkça istemedikçe dosyayı
+  doğrudan okuma; bu bir öneridir, kullanıcıyı zorlama.
+- Maskeli kopyayı (mask) yalnızca kullanıcı istediğinde ya da onay verdiğinde yaz.
 - Her çağrıdan sonra çıkış kodunu kontrol et. 3 (izin yok) ya da 4 (günlük yazılamıyor) ise işi
   durdur ve kullanıcıya hata mesajını aynen ilet. İzni aşmaya, dosyayı başka yoldan okumaya ya da
   kopyalamaya çalışma. Kullanıcıdan BulutBelge › Ayarlar › Ajan erişimi'nde izin vermesini iste.
 - "Kaçak tespiti" hatası dosyanın yazılmadığı anlamına gelir; başka yoldan okumayı deneme,
   kullanıcıya bildir.
 - Uyarılarda "OCR dil dosyaları kurulu değil" ya da "metin katmanı yok" geçiyorsa o sayfa
-  okunamamıştır; çıktıdaki kişisel veri maskelenmemiş olabilir, çıktıya güvenme.
+  okunamamıştır; içeriği çıktıda yoktur, çıktıyı belgenin tamamı sanma. mask "ocr_unavailable"
+  hatası verirse dosya yazılmamıştır: dur ve kullanıcıya bildir.
 - Maskeli metindeki [AD SOYAD], [TC KİMLİK NO], █████ gibi yer tutucuları gerçek değerle
   doldurmaya, tahmin etmeye ya da başka kaynaktan eşleştirmeye çalışma.
 - Maskeyi kaldırma (takma adı gerçek değere çevirme) senin işin değil; gerekirse kullanıcıdan
@@ -215,7 +327,7 @@ Kurallar:
 - Ajan aracı izinli klasördeki dosyalara kabuktan doğrudan erişebiliyorsa BulutBelge bunu engellemez (yukarıda "Zorlanmayan").
 - İşlem günlüğü dosya yollarını tutar; dosya adında kişi adı varsa günlükte de görünür.
 - Başarılı `mask` işlemi arayüzdeki "Son yapılanlar" listesine "Ajan (ad)" etiketiyle de eklenir; `read` ve reddedilen çağrılar yalnızca işlem günlüğüne girer.
-- Taranmış sayfa ve fotoğrafın metin katmanı yoktur: OCR kuruluysa okunur ve maskelenir (OCR hata yapabilir); kurulu değilse `read` çıktısında içerikleri yer almaz, özette uyarı olarak geçer ve o sayfadaki veri maskelenmemiş olabilir.
+- Taranmış sayfa ve fotoğrafın metin katmanı yoktur: OCR kuruluysa okunur ve maskelenir (OCR hata yapabilir); kurulu değilse (kurulum bozuk) `read` çıktısında içerikleri yer almaz ve özette uyarı olarak geçer; `mask` ise maskesiz sayfa yazmamak için reddedilir (çıkış 1, `ocr_unavailable`).
 - Maske kaldırma ve kasa açma komut satırında yoktur.
 
 ## For agents (English summary)
@@ -223,8 +335,11 @@ Kurallar:
 BulutBelge masks personal data in local documents. Use it instead of reading documents directly.
 
 - `bulutbelge folders` — show allowed folders and write permission (a human sets these in the app: Settings › Agent access).
+- `bulutbelge scan <file> --ajan <agent-name>` — scan without changing the document; returns **counts only** (findings per data type, page count, warnings), never values. Add `--json` for machine-readable output.
 - `bulutbelge read <file> --ajan <agent-name>` — print the **masked text** of the document (original values are never returned). Add `--json` for machine-readable output.
 - `bulutbelge mask <file> [--hedef <new file>] --ajan <name>` — write a masked copy to a **new** file inside an allowed folder (never overwrites).
-- Exit codes: 0 ok, 1 document/operation error (including "leak check": file not written), 2 usage error, 3 not allowed, 4 audit log not writable. On 3 or 4 **stop** and relay the error to the user; do not try to bypass permissions.
+- Exit codes: 0 ok, 1 document/operation error (including "leak check" and "ocr_unavailable": file not written), 2 usage error, 3 not allowed, 4 audit log not writable. On 3 or 4 **stop** and relay the error to the user; do not try to bypass permissions.
 - Do not guess or restore masked values. Masking is not 100% accurate; warn the user to review important output.
-- `bulutbelge kilavuz --yonerge` prints a ready-to-paste instruction block for your `AGENTS.md`/`CLAUDE.md`.
+- `bulutbelge mcp` — local MCP server over **stdio only** (no network port): tools `bulutbelge_folders`, `bulutbelge_scan`, `bulutbelge_read`, `bulutbelge_mask` with the same permissions and audit log as the commands. Claude Code: `claude mcp add bulutbelge -- bulutbelge mcp`.
+- `bulutbelge kilavuz --yonerge` prints a ready-to-paste instruction block for your `AGENTS.md`/`CLAUDE.md`; `bulutbelge kilavuz --skill` prints a Claude Code skill (`~/.claude/skills/bulutbelge/SKILL.md`).
+- With a document that may hold personal data: run `scan` first, tell the user what was found and suggest a masked `read`; do not read the file directly and do not write masked copies without the user's consent.

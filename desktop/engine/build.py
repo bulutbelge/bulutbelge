@@ -76,6 +76,9 @@ def main() -> None:
             "--paths", str(CORE_DIR),
             # Belge komutları ilk kullanımda yüklenir, statik analiz göremez.
             "--hidden-import", "bulutbelge_engine.commands",
+            # Ajan komutunun ortak işlevleri ve yerel MCP sunucusu (`bulutbelge-engine mcp`) da ilk kullanımda yüklenir.
+            "--hidden-import", "bulutbelge_engine.ajan",
+            "--hidden-import", "bulutbelge_engine.mcp",
             "--hidden-import", "lxml.etree",
             # Yüz tespiti modeli (haarcascade xml) OpenCV paketinin veri dosyasıdır.
             "--collect-data", "cv2",
@@ -83,6 +86,8 @@ def main() -> None:
             "--add-data", f"{tessdata}{os.pathsep}tessdata",
             # Ajan kılavuzu (`bulutbelge-engine kilavuz`) paketin içinde gelir.
             "--add-data", f"{ENGINE_DIR / 'bulutbelge_engine' / 'kilavuz.md'}{os.pathsep}bulutbelge_engine",
+            # Claude Code becerisi (`bulutbelge-engine kilavuz --skill`).
+            "--add-data", f"{ENGINE_DIR / 'bulutbelge_engine' / 'skill' / 'SKILL.md'}{os.pathsep}bulutbelge_engine/skill",
             str(ENGINE_DIR / "run_engine.py"),
         ],
         check=True,
