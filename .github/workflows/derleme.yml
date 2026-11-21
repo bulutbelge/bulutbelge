@@ -38,8 +38,12 @@ jobs:
           python-version: "3.12"
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libglib2.0-0 fonts-dejavu-core
       - run: pip install "./core[dev]" "./desktop/engine[dev]"
+      - name: OCR dil dosyaları (SHA-256 doğrulamalı; düzleştirme testleri için)
+        run: python desktop/engine/tessdata_indir.py
       - run: python -m pytest -q
         working-directory: core
+        env:
+          BULUTBELGE_TESSDATA: ${{ github.workspace }}/desktop/engine/tessdata
       - run: python -m pytest -q
         working-directory: desktop/engine
 
