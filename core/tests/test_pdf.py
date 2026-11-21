@@ -426,7 +426,7 @@ def test_labeled_tc_and_phone_wrapped_at_line_end_are_blacked_out(tmp_path):
 
 
 def test_open_action_javascript_is_removed(tmp_path):
-    """Katalogdaki OpenAction betiği (içinde değer olsa da) çıktıdan silinir (TAKIP 1.57)."""
+    """Katalogdaki OpenAction betiği (içinde değer olsa da) çıktıdan silinir."""
     tc = fake_tc("376543219")
     src = tmp_path / "betik.pdf"
     doc = pymupdf.open()

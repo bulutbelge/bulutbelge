@@ -1,4 +1,4 @@
-"""tools/degerlendirme.py (TAKIP 1.61) ve tools/kacak_kontrol.py ek katmanları (1.57, 1.80). Yalnızca sahte değer."""
+"""tools/degerlendirme.py ve tools/kacak_kontrol.py ek katmanları (1.57, 1.80). Yalnızca sahte değer."""
 
 import io
 import sys

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- MSI bitiş sayfası Türkçe dizeleri (TAKIP 1.110). Kimlik, Tauri main.wxs şablonundaki !(loc.LaunchApp) ile aynı olmalı. -->
+<!-- MSI bitiş sayfası Türkçe dizeleri. Kimlik, Tauri main.wxs şablonundaki !(loc.LaunchApp) ile aynı olmalı. -->
 <WixLocalization Culture="tr-TR" xmlns="http://schemas.microsoft.com/wix/2006/localization">
   <String Id="LaunchApp">BulutBelge'yi başlat</String>
   <String Id="DowngradeErrorMessage">BulutBelge'nin daha yeni bir sürümü zaten kurulu.</String>

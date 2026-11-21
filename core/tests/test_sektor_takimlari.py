@@ -1,4 +1,4 @@
-"""Sektör kural takımları (TAKIP 1.64). Yalnızca sahte değerler."""
+"""Sektör kural takımları. Yalnızca sahte değerler."""
 
 from datetime import date
 

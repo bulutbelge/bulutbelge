@@ -2,7 +2,7 @@
 alacağı yere (`src-tauri/binaries/engine/`) koyar.
 
 Tek dosya (--onefile) her açılışta ~140 MB'ı geçici klasöre açıyordu (ilk yanıt ~4,3 sn); klasör
-biçiminde ~0,1 sn (TAKIP 1.90, 17 Kasım 2026 ölçümü).
+biçiminde ~0,1 sn (17 Kasım 2026 ölçümü).
 
 Kullanım: engine/.venv içindeki Python ile `python build.py`
 """
@@ -19,7 +19,7 @@ CORE_DIR = ENGINE_DIR.parent.parent / "core"
 
 
 def target_triple() -> str:
-    # CI (TAKIP 1.87): Rust kurulu olmayan temiz ortamda hedef ortam değişkeninden verilir.
+    # CI: Rust kurulu olmayan temiz ortamda hedef ortam değişkeninden verilir.
     if os.environ.get("BULUTBELGE_TARGET"):
         return os.environ["BULUTBELGE_TARGET"]
     out = subprocess.run(["rustc", "-vV"], capture_output=True, text=True, check=True).stdout
@@ -27,6 +27,36 @@ def target_triple() -> str:
         if line.startswith("host:"):
             return line.split(":", 1)[1].strip()
     raise RuntimeError("rustc host üçlüsü bulunamadı")
+
+
+# Pakete girmemesi gereken klasörler: PyMuPDF'nin düzen çözümleme modülü ve model dosyaları
+# (~50 MB; yalnızca `get_layout`/`find_tables` kullanır, motor ikisini de çağırmaz) ve C geliştirme
+# başlıkları. PyInstaller kancası bunları veri dosyası olarak topluyor.
+SILINECEK = ("pymupdf/layout", "pymupdf/mupdf-devel")
+
+# Pakette bulunursa derleme durur. Ad parçası, büyük/küçük harf duyarsız.
+# - pymupdf4llm, onnxruntime: kullanılmaz; lisans ve boyut (NOTICE.md).
+# - FFmpeg ve GPL kodekleri: OpenCV video modülü olmadan (FFmpeg'siz) derlenmiş olmalı.
+YASAK_PARCALAR = (
+    "pymupdf4llm", "onnxruntime", "pymupdf_layout",
+    "libavcodec", "libavformat", "libavutil", "libswscale", "libswresample", "libpostproc",
+    "libx264", "libx265", "librubberband", "libvidstab", "opencv_videoio_ffmpeg", "avcodec-", "avformat-",
+)
+
+
+def paket_icerigini_denetle(kok: Path) -> None:
+    """Paketlenmiş motor klasöründe yasak dosya ya da klasör olmadığını doğrular (NOTICE.md, T4)."""
+    for yol in SILINECEK:
+        hedef = kok / "_internal" / yol
+        if hedef.exists():
+            shutil.rmtree(hedef)
+    bulunan = sorted(
+        str(p.relative_to(kok))
+        for p in kok.rglob("*")
+        if any(parca in p.name.lower() for parca in YASAK_PARCALAR)
+    )
+    if bulunan:
+        raise SystemExit("Pakette olmaması gereken dosyalar var:\n  " + "\n  ".join(bulunan[:40]))
 
 
 def main() -> None:
@@ -58,6 +88,7 @@ def main() -> None:
         check=True,
         cwd=ENGINE_DIR,
     )
+    paket_icerigini_denetle(work / "dist" / "bulutbelge-engine")
     ext = ".exe" if sys.platform == "win32" else ""
     BIN_DIR.mkdir(parents=True, exist_ok=True)
     dest = BIN_DIR / "engine"

@@ -1,4 +1,4 @@
-"""Geçici klasör hijyeni (TAKIP 1.73). Yalnızca sahte veri."""
+"""Geçici klasör hijyeni. Yalnızca sahte veri."""
 
 import os
 import stat

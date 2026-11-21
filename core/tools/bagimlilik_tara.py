@@ -1,4 +1,4 @@
-"""Bağımlılık taraması ve CycloneDX SBOM üretimi (TAKIP 1.88).
+"""Bağımlılık taraması ve CycloneDX SBOM üretimi.
 
 Yalnızca standart kütüphane. SBOM kilit dosyalarından ve kurulu Python paketlerinden
 üretilir; yalnızca paket adı ve sürümü yazılır. npm audit, cargo audit ve pip-audit

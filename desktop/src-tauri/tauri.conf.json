@@ -17,7 +17,7 @@
         "height": 720,
         "minWidth": 800,
         "minHeight": 560,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-component-update --no-pings --disable-sync"
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,DnsOverHttps --disable-background-networking --disable-component-update --no-pings --disable-sync"
       }
     ],
     "security": {

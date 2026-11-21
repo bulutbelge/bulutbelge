@@ -274,7 +274,7 @@ function baseSheet(): CSSStyleSheet {
 }
 
 /**
- * İçerik Güvenlik Politikası (CSP) `style-src 'self'` (unsafe-inline yok, TAKIP 1.90): docx-preview'un ürettiği
+ * İçerik Güvenlik Politikası (CSP) `style-src 'self'` (unsafe-inline yok): docx-preview'un ürettiği
  * `<style>` öğeleri ve `style="..."` öznitelikleri tarayıcı tarafından uygulanmaz. CSSOM ile verilen stiller ise
  * politikaya tabi değildir; bu yüzden çizimden sonra stiller CSSOM ile, ama yalnızca belgenin shadow root'unda
  * uygulanır (güvenlik taraması F13, F14, F28: belge CSS'i eskiden `document.adoptedStyleSheets`e, yani bütün

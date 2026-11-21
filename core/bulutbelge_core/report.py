@@ -1,4 +1,4 @@
-"""Gizleme raporu (TAKIP 1.30, 1.44, 1.66): bir maskeleme işleminin yöntemini, tarihini,
+"""Gizleme raporu: bir maskeleme işleminin yöntemini, tarihini,
 gerekçesini ve dosya özetlerini anlatan, değer taşımayan kısa metin.
 
 Rapora yalnızca (kişi adı gizlenmiş) dosya adı, SHA-256 özeti, tür bazında sayı, yöntem adı, profil ve gerekçe girer.
@@ -36,7 +36,7 @@ _CLEANUP_COUNTS = (
 
 
 def _cleanup_lines(cleanup: dict[str, Any]) -> list[str]:
-    """Temizlik bölümü (TAKIP 1.67): yalnızca adet ve alan adı; ad, yorum metni ve değer yazılmaz."""
+    """Temizlik bölümü: yalnızca adet ve alan adı; ad, yorum metni ve değer yazılmaz."""
     lines = ["Temizlenen gizli bilgiler (adet ya da alan adı; değerler yazılmaz):"]
     for key, label in _CLEANUP_COUNTS:
         if cleanup.get(key):
@@ -51,7 +51,7 @@ def _cleanup_lines(cleanup: dict[str, Any]) -> list[str]:
 
 
 def _recognizability_lines(r: dict[str, Any]) -> list[str]:
-    """Yeniden tanınabilirlik bölümü (TAKIP 1.70): yalnızca tür adı, adet ve puan; değer yazılmaz."""
+    """Yeniden tanınabilirlik bölümü: yalnızca tür adı, adet ve puan; değer yazılmaz."""
     from .tanima import LABELS, WEIGHTS
 
     lines = [

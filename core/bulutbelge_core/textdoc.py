@@ -165,7 +165,7 @@ def _csv_cells(text: str) -> list[tuple[int, int, int, int]]:
 
 
 def _split_cell_findings(text: str, rules: Rules, encoding: str, existing: list["TextFinding"]) -> list["TextFinding"]:
-    """Yan yana CSV hücrelerine bölünmüş TC/IBAN/telefon (TAKIP 1.62); her parça hücre kendi bulgusu olur."""
+    """Yan yana CSV hücrelerine bölünmüş TC/IBAN/telefon; her parça hücre kendi bulgusu olur."""
     rows: dict[int, list[tuple[int, int, int]]] = {}
     for r, c, s, e in _csv_cells(text):
         rows.setdefault(r, []).append((c, s, e))

@@ -125,7 +125,7 @@ def test_word_scan_and_bytes(tmp_path):
     assert data.startswith("UEsDB")  # ZIP imzası (PK..) base64'te
 
 def test_mask_reports_when_saved_path_differs(tmp_path):
-    # Mac bildirimi (TAKIP 1.36): seçilen yer ile yazılan yer farklıysa kullanıcıya söylenir.
+    # Mac bildirimi: seçilen yer ile yazılan yer farklıysa kullanıcıya söylenir.
     src = tmp_path / "a.txt"
     src.write_text("E-posta: ayse@ornek.com.tr", encoding="utf-8")
 

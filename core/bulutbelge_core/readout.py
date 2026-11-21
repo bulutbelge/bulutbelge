@@ -1,4 +1,4 @@
-"""Maskeli okuma: belgenin metnini maskelenmiş olarak döndürür (ajan komutu, TAKIP 1.37).
+"""Maskeli okuma: belgenin metnini maskelenmiş olarak döndürür (ajan komutu).
 
 Metin ayrıca maskelenmez; belge her zamanki maskeleyiciyle (kaçak denetimi dahil)
 geçici bir klasöre maskelenir ve metin o maskeli kopyadan çıkarılır. Böylece
@@ -112,6 +112,6 @@ def read_masked(source: str | os.PathLike, rules: Rules) -> MaskedRead:
     if len(text) > MAX_CHARS:
         text = text[:MAX_CHARS]
         notes.append(f"Çıktı {MAX_CHARS:,} karakterde kesildi.".replace(",", "."))
-    # Özel nitelikli sözcükler maskelenmez; maskeli metinde taranır (TAKIP 1.46).
+    # Özel nitelikli sözcükler maskelenmez; maskeli metinde taranır.
     special = special_warnings(scan_special(text))
     return MaskedRead(kind, text, masked, counts, [*warnings, *notes, *special])

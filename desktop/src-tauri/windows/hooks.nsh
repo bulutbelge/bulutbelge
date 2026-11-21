@@ -1,4 +1,4 @@
-; BulutBelge komut satırı (TAKIP 1.33): NSIS kurulumu, kurulum klasörünü KULLANICI PATH'ine ekler ve
+; BulutBelge komut satırı: NSIS kurulumu, kurulum klasörünü KULLANICI PATH'ine ekler ve
 ; `bulutbelge` kısa adını yazar; böylece yeni açılan terminalde `bulutbelge read <dosya>` çalışır.
 ; Kaldırınca ikisi de geri alınır. Yalnızca geçerli kullanıcının ortamı değişir (yönetici izni gerekmez).
 ; Not: MSI paketi PATH'e dokunmaz; MSI kullananlar komutu tam yolla çağırır (docs/AJAN-KOMUT-SATIRI.md).

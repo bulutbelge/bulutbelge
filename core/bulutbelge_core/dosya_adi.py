@@ -1,4 +1,4 @@
-"""Dosya adı hijyeni (TAKIP 1.60): dosya adı ve yoldaki kişi adı.
+"""Dosya adı hijyeni: dosya adı ve yoldaki kişi adı.
 
 Dosya adı belgenin içeriği kadar kişisel olabilir ("Ahmet Yılmaz sözleşme.pdf"). Bu modül adı
 (yol parçalarını da) bulur, maskeli çıktı için ad önerir ve kayıtlara yazılacak yolu temizler.

@@ -4,7 +4,7 @@ import { useT } from "./i18n";
 import { Icon } from "./ui";
 
 /**
- * Sorumluluk reddi (TAKIP 1.94). Metnin aslı bulutbelge.com/kosullar.html'dedir (son güncelleme 10 Kasım 2026);
+ * Sorumluluk reddi. Metnin aslı bulutbelge.com/kosullar.html'dedir (son güncelleme 10 Kasım 2026);
  * burada özeti gösterilir. İlk açılışta bir kez kabul istenir, Ayarlar'da her zaman okunabilir.
  */
 const KOSUL_ADRESI = "https://bulutbelge.com/kosullar.html";

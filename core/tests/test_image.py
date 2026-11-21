@@ -76,7 +76,7 @@ def test_scanned_pdf_is_ocrd_and_masked(tmp_path):
 
 
 def _imza_formu(path: Path, yon: int) -> None:
-    """Etiketin altında, etiketin başından başlayan el imzası; EXIF yönüyle döndürülmüş fotoğraf (TAKIP 1.74)."""
+    """Etiketin altında, etiketin başından başlayan el imzası; EXIF yönüyle döndürülmüş fotoğraf."""
     import math
 
     from PIL import ImageDraw
@@ -123,7 +123,7 @@ def _renkli_imzali_gorsel(path: Path, renk: tuple[int, int, int]) -> None:
 
 
 def test_gorselde_renkli_imza_etiketsiz_onerilir_ve_silinir(tmp_path):
-    """OCR olsun olmasın: renkli imza lekesi önerilir (TAKIP 1.17); elle seçim yine çalışır."""
+    """OCR olsun olmasın: renkli imza lekesi önerilir; elle seçim yine çalışır."""
     src = tmp_path / "imza.png"
     _renkli_imzali_gorsel(src, (25, 40, 120))
     scan = scan_pdf(src, Rules.from_dict(None))

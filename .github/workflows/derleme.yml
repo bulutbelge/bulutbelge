@@ -1,4 +1,4 @@
-# Açık depo sürüm derlemesi (TAKIP 1.106). Bitbucket'taki bitbucket-pipelines.yml derleme adımları (1.87) örnek alındı.
+# Açık depo sürüm derlemesi. Bitbucket'taki bitbucket-pipelines.yml derleme adımları (1.87) örnek alındı.
 # v* etiketinde ve elle çalışır: önce testler, sonra Windows (MSI, NSIS), macOS (dmg), Linux (deb, AppImage),
 # en sonda SHA256SUMS ve taslak Release. İmzasız derlemedir; imza adımı için aşağıdaki SignPath yer tutucusuna bakın.
 # Eylemler commit SHA'sı ile sabitlenir; sürüm yorumu yanındadır. Güncellerken SHA'yı etiketten yeniden çözün.
@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Elle çalıştırmada macOS isteğe bağlı (ilk sürüm Windows, TAKIP 1.86); etikette her zaman derlenir.
+        # Elle çalıştırmada macOS isteğe bağlı (ilk sürüm Windows); etikette her zaman derlenir.
         # exclude yalnızca temel boyuta uygulanır; include satırları ad eşleşmesiyle özellik ekler.
         ad: [windows, macos, linux]
         exclude:
@@ -105,6 +105,13 @@ jobs:
           python -m pip install --no-cache-dir --require-hashes -r desktop/engine/requirements.lock $ek
           python -m pip install --no-cache-dir --no-deps --no-build-isolation ./core ./desktop/engine
           python -m pip check
+      # OpenCV FFmpeg'siz derlenir (GPL kodekleri pakete girmesin); ilk koşu uzun sürer, sonra önbellekten gelir.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/bb-opencv
+          key: opencv-${{ matrix.hedef }}-${{ hashFiles('desktop/engine/requirements.lock', 'desktop/engine/opencv_derle.py') }}
+      - name: OpenCV (FFmpeg'siz, kaynaktan, kilit özetiyle doğrulanır)
+        run: python desktop/engine/opencv_derle.py --onbellek ~/.cache/bb-opencv
       - name: OCR dil dosyaları (SHA-256 doğrulamalı)
         run: python desktop/engine/tessdata_indir.py
       - name: Motoru paketle (PyInstaller)
@@ -118,7 +125,7 @@ jobs:
       - name: Uygulamayı derle (Tauri)
         working-directory: desktop
         run: npx tauri build --config src-tauri/tauri.release.conf.json
-      # İMZA (yer tutucu, TAKIP 1.85/1.106): SignPath onayı gelince açılır. Gizli değişken adları yalnızca burada
+      # İMZA (yer tutucu): SignPath onayı gelince açılır. Gizli değişken adları yalnızca burada
       # anılır; değerleri açık depoda asla yer almaz, GitHub › Settings › Secrets and variables altında tutulur.
       # - name: SignPath ile imzala (Windows)
       #   if: matrix.ad == 'windows'
@@ -135,7 +142,7 @@ jobs:
           for p in ${{ matrix.paketler }}; do
             find "$bundle/$p" -maxdepth 1 -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) -exec cp {} cikti/ \;
           done
-      # Çevrimdışı Windows paketi (TAKIP 1.111): WebView2 kurulum paketin içindedir (internetsiz kurumlar için).
+      # Çevrimdışı Windows paketi: WebView2 kurulum paketin içindedir (internetsiz kurumlar için).
       # Normal paketler yukarıda cikti/ içine kopyalandı; burada aynı paketler yeniden derlenir ve "-cevrimdisi" ekiyle adlandırılır.
       - name: Uygulamayı derle, çevrimdışı (Tauri, Windows)
         if: matrix.ad == 'windows'
@@ -160,6 +167,7 @@ jobs:
           name: kurulum-${{ matrix.ad }}
           path: cikti/*
           if-no-files-found: error
+          retention-days: 3
 
   yayin:
     name: SHA256SUMS ve taslak Release

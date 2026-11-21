@@ -8329,7 +8329,7 @@ mark.hl {
   transform: rotate(90deg);
   color: var(--accent);
 }
-/* Kaydedilen yol seçilenden farklı (TAKIP 1.36) */
+/* Kaydedilen yol seçilenden farklı */
 .path-changed {
   display: flex;
   align-items: flex-start;
@@ -8348,7 +8348,7 @@ mark.hl {
   color: var(--warn);
 }
 
-/* ---------- Ajan erişimi ve işlem günlüğü (TAKIP 1.37, 1.38) ---------- */
+/* ---------- Ajan erişimi ve işlem günlüğü ---------- */
 
 .agent-panel {
   display: grid;

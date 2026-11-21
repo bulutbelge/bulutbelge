@@ -1,4 +1,4 @@
-"""Üçüncü taraf lisans listesini üretir (TAKIP T4, T5; NOTICE.md "Yenileme" adımı).
+"""Üçüncü taraf lisans listesini üretir (T5; NOTICE.md "Yenileme" adımı).
 
 Kullanım (depo kökünden):
     python core/tools/lisans_listesi_uret.py > THIRD-PARTY-LICENSES.md

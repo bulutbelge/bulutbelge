@@ -83,7 +83,7 @@ Yasemin Yelda Yonca Zarife Zehra Zekiye Zeynep Zilan Zübeyde Ayşenur Fatmanur 
 Rabia Ravza Reyyan Rojin Rüya Sıla Sidre Suzan Sümbül Şeref Tuana Ülfet Yağmur Yıldız Zahide Zelal
 """
 
-# 17 Kasım 2026 (TAKIP 1.47): ad listesinde olmayan adların etiketsiz bağlamda kaçmasını azaltmak için eklendi.
+# 17 Kasım 2026: ad listesinde olmayan adların etiketsiz bağlamda kaçmasını azaltmak için eklendi.
 # Yalnızca yaygın adlar; gündelik sözcükle karışanlar (Kuzey, Poyraz, Rüzgar, Fırat, Çınar vb.) bilerek eklenmedi.
 _EXTRA_FIRST_NAMES = """
 Abdulhamit Abdulkerim Abdullah Adnan Ahsen Akın Alaaddin Alihan Alpay Anıl Arman Atahan Aydın Aytaç Azmi Barkın

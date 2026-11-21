@@ -1,4 +1,4 @@
-﻿"""TAKIP 1.62: Word ve PowerPoint tablosunda hücrelere bölünmüş TC/IBAN/telefon."""
+﻿"""Word ve PowerPoint tablosunda hücrelere bölünmüş TC/IBAN/telefon."""
 
 from pathlib import Path
 

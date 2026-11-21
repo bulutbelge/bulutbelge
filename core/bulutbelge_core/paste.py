@@ -26,7 +26,7 @@ class PasteFinding:
 
 
 def is_delimited_table(text: str) -> bool:
-    """Metin ayraçlı tablo mu (CSV/TSV, TAKIP 1.104): başlık + en az 1 veri satırı, tutarlı ≥2 sütun.
+    """Metin ayraçlı tablo mu (CSV/TSV): başlık + en az 1 veri satırı, tutarlı ≥2 sütun.
 
     Temkinli: başlık hücreleri kısa, dolu ve tekrarsız olmalı; aksi hâlde düz metin sayılır.
     """

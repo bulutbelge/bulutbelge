@@ -124,7 +124,7 @@ fn engine_command() -> Result<Command, String> {
 
 #[cfg(not(debug_assertions))]
 fn engine_command() -> Result<Command, String> {
-    // Motor klasör olarak (`engine/`) kaynaklarla gelir (TAKIP 1.90). Konum işletim sistemine göre değişir:
+    // Motor klasör olarak (`engine/`) kaynaklarla gelir. Konum işletim sistemine göre değişir:
     // Windows: uygulamanın yanında; macOS: Contents/Resources; Linux (.deb): /usr/lib/<ürün>.
     let exe = std::env::current_exe().map_err(|e| format!("uygulama yolu bulunamadı: {e}"))?;
     let dir = exe.parent().ok_or("uygulama dizini bulunamadı")?;

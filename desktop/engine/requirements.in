@@ -1,4 +1,4 @@
-# Motor paketinin üçüncü taraf bağımlılıkları (TAKIP 1.87). Kaynak: core/pyproject.toml ve
+# Motor paketinin üçüncü taraf bağımlılıkları. Kaynak: core/pyproject.toml ve
 # desktop/engine/pyproject.toml bağımlılıkları + paketleyici. Değiştirince kilidi yeniden üretin:
 #   pip-compile --generate-hashes --allow-unsafe -o requirements.lock requirements.in
 pymupdf>=1.24

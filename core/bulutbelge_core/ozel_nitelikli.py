@@ -1,4 +1,4 @@
-"""Özel nitelikli kişisel veri uyarısı (KVKK m.6, TAKIP 1.46).
+"""Özel nitelikli kişisel veri uyarısı (KVKK m.6).
 
 Sözcük tabanlı ve yaklaşıktır: sağlık, din, etnik köken, sendika, ceza vb. konulara ait
 sözcükler metinde geçiyorsa kategori başına geçiş sayısı döner. Bu bir bulgu değildir;

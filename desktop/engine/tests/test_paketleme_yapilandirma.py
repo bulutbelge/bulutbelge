@@ -1,4 +1,4 @@
-"""Paketleme yapılandırması: lisans dosyası yolu ve Windows'a özgü hash'li bağımlılıklar (TAKIP 1.106)."""
+"""Paketleme yapılandırması: lisans dosyası yolu ve Windows'a özgü hash'li bağımlılıklar."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def test_lisans_dosyasi_bundle_altinda_ve_var():
 
 
 def test_csp_satir_ici_stil_ve_betik_izni_vermez():
-    """TAKIP 1.90: Word önizlemesinin stilleri CSSOM ile uygulanır (WordPreview.adoptRenderedStyles); politika gevşetilmez."""
+    """Word önizlemesinin stilleri CSSOM ile uygulanır (WordPreview.adoptRenderedStyles); politika gevşetilmez."""
     csp = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))["app"]["security"]["csp"]
     yonergeler = {p.split()[0]: p.split()[1:] for p in (x.strip() for x in csp.split(";")) if p}
     assert "'unsafe-inline'" not in csp and "'unsafe-eval'" not in csp
@@ -57,7 +57,7 @@ def test_kilitte_windows_bagimliliklari_hashli_ve_isaretli():
 
 
 def test_wix_turkce_yerellestirme_dosyasi_var_ve_launchapp_tanimli():
-    """MSI bitiş sayfasındaki 'Launch' kutusu Türkçe olsun (TAKIP 1.110)."""
+    """MSI bitiş sayfasındaki 'Launch' kutusu Türkçe olsun."""
     conf = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))
     dil = conf["bundle"]["windows"]["wix"]["language"]
     assert isinstance(dil, dict) and "en-US" in dil
@@ -96,5 +96,5 @@ def test_webview2_arka_plan_agi_kapali_bayraklarla_baslar():
     """W.1: WebView2'nin kendi arka plan trafiği (güncelleme, eşitleme, ping) kısılır; Tauri'nin varsayılan bayrakları korunur."""
     pencere = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))["app"]["windows"][0]
     bayraklar = pencere["additionalBrowserArgs"]
-    for b in ("msWebOOUI", "msPdfOOUI", "msSmartScreenProtection", "--disable-background-networking", "--disable-component-update", "--no-pings", "--disable-sync"):
+    for b in ("msWebOOUI", "msPdfOOUI", "msSmartScreenProtection", "DnsOverHttps", "--disable-background-networking", "--disable-component-update", "--no-pings", "--disable-sync"):
         assert b in bayraklar

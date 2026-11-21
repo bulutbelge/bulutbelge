@@ -1,4 +1,4 @@
-"""Office içindeki görsellerde yüz tespiti ve OCR (TAKIP 1.32). Yalnızca sahte değerler."""
+"""Office içindeki görsellerde yüz tespiti ve OCR. Yalnızca sahte değerler."""
 
 import io
 import zipfile

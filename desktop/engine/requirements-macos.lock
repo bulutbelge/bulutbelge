@@ -1,4 +1,4 @@
-# Yalnızca macOS'ta PyInstaller'ın gerek duyduğu paket (TAKIP 1.106). requirements.lock Linux'ta üretildi.
+# Yalnızca macOS'ta PyInstaller'ın gerek duyduğu paket. requirements.lock Linux'ta üretildi.
 # altgraph zaten requirements.lock içindedir. `pip install --require-hashes -r requirements-macos.lock` ile kurulur.
 macholib==1.16.4 \
     --hash=sha256:da1a3fa8266e30f0ce7e97c6a54eefaae8edd1e5f86f3eb8b95457cae90265ea \

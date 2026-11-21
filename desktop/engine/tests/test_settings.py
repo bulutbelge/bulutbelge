@@ -303,7 +303,7 @@ def test_profile_import_rejects_invalid_pattern():
 
 
 def test_history_does_not_store_person_names_in_paths(data_dir):
-    """TAKIP 1.60: dosya adı ve yoldaki kişi adı history.db'ye yazılmaz (yalnızca sahte adlar)."""
+    """dosya adı ve yoldaki kişi adı history.db'ye yazılmaz (yalnızca sahte adlar)."""
     entry = {
         "path": "/home/Ahmet Yılmaz/Ayşe Demir kira.pdf",
         "target": "/home/Ahmet Yılmaz/kisi_maskeli.pdf",

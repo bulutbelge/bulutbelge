@@ -1,4 +1,4 @@
-"""Karışık yazılmış TC, IBAN, telefon, kart ve VKN numaraları (TAKIP 1.62).
+"""Karışık yazılmış TC, IBAN, telefon, kart ve VKN numaraları.
 
 Aralıklı, noktalı, parantezli, tam genişlikli rakamlar, OCR karışıklıkları
 (O/0, l/1, I/1, S/5) ve (IBAN için) satır bölünmesi burada normalleştirilir.

@@ -1,4 +1,4 @@
-"""Özel nitelikli veri uyarısı (KVKK m.6, TAKIP 1.46). Tüm veriler sahtedir."""
+"""Özel nitelikli veri uyarısı (KVKK m.6). Tüm veriler sahtedir."""
 
 from bulutbelge_core.ozel_nitelikli import scan_document, scan_special, special_warnings
 from bulutbelge_core.readout import read_masked

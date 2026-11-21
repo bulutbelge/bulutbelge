@@ -1,4 +1,4 @@
-"""Saldırgan gözüyle test: maskeli çıktıda orijinal değerleri ve parçalarını arar (TAKIP 1.72).
+"""Saldırgan gözüyle test: maskeli çıktıda orijinal değerleri ve parçalarını arar.
 
 Katmanlar: metin, ham bayt (UTF-8/UTF-16/Latin-1), zip parçaları, PDF akışları ve meta veri.
 Aranan parçalar: tam değer, rakamlar (ayraçsız), son 4 hane, baş harfler/adın parçaları, biçim.

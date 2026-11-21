@@ -1,4 +1,4 @@
-"""TAKIP 1.58: glif konumu ve boşluk sızıntısı denetiminin kapsam testleri.
+"""glif konumu ve boşluk sızıntısı denetiminin kapsam testleri.
 
 Yanlış alarm (temiz belgede dosyanın durdurulması ya da gereksiz "kayma" uyarısı) ve kaçak
 (kerning'li TJ dizisi, döndürülmüş, çok küçük ve harf harf yazılmış değer) durumları.

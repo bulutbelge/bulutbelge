@@ -1,4 +1,4 @@
-"""Hash zincirli işlem günlüğü (TAKIP 1.38, 1.28 ile birleşik).
+"""Hash zincirli işlem günlüğü (1.28 ile birleşik).
 
 Her satır bir JSON kaydıdır. Kayıt, bir önceki kaydın özetini (`prev`) taşır ve
 kendi özeti (`hash`) kaydın geri kalanının SHA-256'sıdır; aradaki bir kaydın
@@ -366,7 +366,7 @@ class AuditLog:
                     "target_sha256": _opt_str(target_sha256, 64),
                     "counts": _clean_counts(counts),
                     "profile": _opt_str(profile, 60),
-                    # İşlemin amacı (sunucuda zorunlu, TAKIP 2.5); masaüstünde boş kalabilir.
+                    # İşlemin amacı (sunucuda zorunlu); masaüstünde boş kalabilir.
                     "purpose": _opt_str(purpose, 200),
                     "caller": caller,
                     "agent": _opt_str(agent, 60),
@@ -379,7 +379,7 @@ class AuditLog:
                 if calisan:
                     # API'yi çağıran uygulamanın bildirdiği çalışan kimliği (İ.10); doğrulaması uygulamaya aittir.
                     record["calisan"] = _opt_str(calisan, 64)
-                # Tek alan görüntüleme (TAKIP 2.14): hangi uygulama (anahtar adı), uygulamadaki kayıt ve alan.
+                # Tek alan görüntüleme: hangi uygulama (anahtar adı), uygulamadaki kayıt ve alan.
                 # Değerin kendisi hiçbir zaman yazılmaz.
                 if uygulama:
                     record["uygulama"] = _opt_str(uygulama, 60)

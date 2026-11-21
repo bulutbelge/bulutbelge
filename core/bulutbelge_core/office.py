@@ -291,7 +291,7 @@ def _col_number(ref: str) -> int:
 def _split_cell_findings(
     fmt: OfficeFormat, roots: dict[str, etree._Element], existing: list[OfficeFinding], rules: Rules
 ) -> list[OfficeFinding]:
-    """Yan yana hücrelere bölünmüş TC/IBAN/telefon (TAKIP 1.62).
+    """Yan yana hücrelere bölünmüş TC/IBAN/telefon.
 
     Satırdaki ardışık sütunların metni birleştirilir; bulunan değerin her hücresi (paylaşılan metin
     hücresiyse o metin) kendi bulgusu olur. Hücre başına bir bulgu: kullanıcı hücreleri ayrı seçebilir.
@@ -352,7 +352,7 @@ def _split_cell_findings(
 def _split_table_findings(
     fmt: OfficeFormat, roots: dict[str, etree._Element], existing: list[OfficeFinding], rules: Rules
 ) -> list[OfficeFinding]:
-    """Word/PowerPoint tablosunda yan yana hücrelere bölünmüş TC/IBAN/telefon (TAKIP 1.62).
+    """Word/PowerPoint tablosunda yan yana hücrelere bölünmüş TC/IBAN/telefon.
 
     Excel'deki gibi: satırdaki ardışık hücrelerin metni birleştirilip doğrulanır. Hücre başına tek dolu
     paragraf aranır (bulgu o paragrafın tamamıdır); birden çok dolu paragraflı hücre diziyi keser.
@@ -591,7 +591,7 @@ def _sweep_attributes(roots: dict[str, etree._Element], included: list[OfficeFin
     """Öznitelik değerlerinde (görsel alternatif metni `descr`, köprü ipucu `tooltip` vb.) kalan değerleri değiştirir.
 
     Bulgular metin öğelerinde uygulanır; aynı değer bir özniteliğin içinde de geçebilir ve orada kalırdı
-    (TAKIP 1.57: gizli-word.docx görsel alternatif metni). Metin öznitelikleri ayrıca taranır. Her bulgunun değeri, bulunduğu yerin yerine
+    (gizli-word.docx görsel alternatif metni). Metin öznitelikleri ayrıca taranır. Her bulgunun değeri, bulunduğu yerin yerine
     konan metinle aynı biçimde değiştirilir; uzun değerler önce.
     """
     pairs = sorted(
@@ -661,7 +661,7 @@ def _scrub_rels(data: bytes, rules: Rules) -> bytes:
     return _dump(root)
 
 
-# ---------------------------------------------------------------- aktif içerik (TAKIP 2.21)
+# ---------------------------------------------------------------- aktif içerik
 
 # Maskeli kopyada bulunmaması gereken parçalar: makro, OLE/gömülü nesne, ActiveX, dış çalışma kitabı bağlantıları.
 _AKTIF_PARCA = re.compile(
@@ -1220,9 +1220,9 @@ def mask_bytes(
             for info in z.infolist():
                 name = info.filename
                 if name in dropped:
-                    continue  # makro, OLE/gömülü nesne, ActiveX, dış bağlantı parçaları atılır (TAKIP 2.21)
+                    continue  # makro, OLE/gömülü nesne, ActiveX, dış bağlantı parçaları atılır
                 if _is_thumbnail(name):
-                    continue  # önizleme görseli özgün sayfayı gösterir; atılır, ilişkisi aşağıda silinir (TAKIP 1.57)
+                    continue  # önizleme görseli özgün sayfayı gösterir; atılır, ilişkisi aşağıda silinir
                 if name == "_rels/.rels":
                     data = _aktif_rels(_scrub_rels(_drop_thumbnail_rels(z.read(name)), rules))
                 elif name == "[Content_Types].xml":

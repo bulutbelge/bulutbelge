@@ -1,4 +1,4 @@
-"""Temizlik özeti (TAKIP 1.67): maskeli kopyada silinen yazar, yorum, izlenen değişiklik ve meta veri.
+"""Temizlik özeti: maskeli kopyada silinen yazar, yorum, izlenen değişiklik ve meta veri.
 
 Kaynak dosya okunur; yalnızca adetler ve alan adları döner. Yazar adı, yorum metni ve meta veri
 değerleri hiçbir yerde tutulmaz ya da yazılmaz (rapora değer girmez).

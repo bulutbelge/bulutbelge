@@ -53,7 +53,7 @@ function fileName(path: string | null): string {
 }
 
 /**
- * İşlem günlüğü (TAKIP 1.38): okunan, maskelenen ve dışa aktarılan her belge. Kayıtlar hash zinciriyle
+ * İşlem günlüğü: okunan, maskelenen ve dışa aktarılan her belge. Kayıtlar hash zinciriyle
  * birbirine bağlıdır; "Zinciri denetle" sonradan değiştirilen ya da silinen kaydı bulur. Günlükte bulunan
  * değerler ve belge içeriği yoktur; yalnızca tür bazında sayılar.
  */

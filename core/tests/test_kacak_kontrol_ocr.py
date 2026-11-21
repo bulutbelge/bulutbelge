@@ -1,4 +1,4 @@
-"""kacak_kontrol.py: OCR yokken görsel kontrolü sessizce 'temiz' saymaz (TAKIP 1.80)."""
+"""kacak_kontrol.py: OCR yokken görsel kontrolü sessizce 'temiz' saymaz."""
 
 import importlib.util
 import json

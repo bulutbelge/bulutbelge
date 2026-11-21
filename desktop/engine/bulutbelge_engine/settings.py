@@ -90,7 +90,7 @@ def _clean_profile(p: Any) -> dict[str, Any]:
     if p.get("pseudonym_scope") == "belge":
         profile["pseudonym_scope"] = "belge"  # varsayılan (ortak) yazılmaz
     if p.get("varsayilan_sutun_sozlugu") is False:
-        profile["varsayilan_sutun_sozlugu"] = False  # varsayılan (açık) yazılmaz; TAKIP 1.105
+        profile["varsayilan_sutun_sozlugu"] = False  # varsayılan (açık) yazılmaz
     if p.get("column_rules"):
         profile["column_rules"] = [
             {"header": str(x.get("header") or ""), "type": str(x.get("type") or "")}
@@ -165,7 +165,7 @@ def save_settings(params: dict[str, Any]) -> dict[str, Any]:
     return {"profiles": profiles, "active": active}
 
 
-# ---------- Profil dışa/içe aktarma (TAKIP 1.34) ----------
+# ---------- Profil dışa/içe aktarma ----------
 
 PROFILE_PACK_KIND = "bulutbelge-profiller"
 PROFILE_PACK_VERSION = 1
@@ -573,7 +573,7 @@ def _history_conn() -> sqlite3.Connection:
 
 
 def _scrub_existing_history(conn: sqlite3.Connection) -> None:
-    """Eski kayıtlardaki yol ve klasör adlarından kişi adlarını temizler (TAKIP 1.60)."""
+    """Eski kayıtlardaki yol ve klasör adlarından kişi adlarını temizler."""
     try:
         for r in conn.execute("SELECT * FROM recent_history").fetchall():
             new = {k: scrub_path(r[k]) if r[k] else r[k] for k in ("target", "path", "folder_name", "folder_root")}
@@ -652,7 +652,7 @@ def _clean_history_entry(
 ) -> tuple[str, str, int, int, str | None, int, int, str | None, str | None, str | None, str | None] | None:
     if not isinstance(raw, dict):
         return None
-    # Dosya adı ve yoldaki kişi adları veritabanına yazılmaz (TAKIP 1.60).
+    # Dosya adı ve yoldaki kişi adları veritabanına yazılmaz.
     target = scrub_path(str(raw.get("target") or "").strip())
     path = scrub_path(str(raw.get("path") or "").strip())
     if not target or not path:
@@ -754,7 +754,7 @@ def history_clear() -> list[dict[str, Any]]:
         conn.commit()
     return []
 
-# ---------- Ajan erişimi (komut satırı, TAKIP 1.37) ----------
+# ---------- Ajan erişimi (komut satırı) ----------
 
 AGENT_FILE = "ajan.json"
 MAX_AGENT_FOLDERS = 20

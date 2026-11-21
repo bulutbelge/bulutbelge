@@ -1,7 +1,7 @@
 """Hazır kural takımları ("Kime gidecek?"): masaüstü uygulaması ve sunucu ortak kullanır.
 
 Masaüstünde bunlar ilk açılışta kullanıcının ayarlarına bir kez eklenir (kullanıcı değiştirebilir,
-silebilir); sunucuda yönetim arayüzü gelene kadar (TAKIP 2.6) doğrudan bunlar kullanılır.
+silebilir); sunucuda yönetim arayüzü gelene kadar doğrudan bunlar kullanılır.
 Her takım varsayılan kuralların üzerine yalnızca farklı olan türleri yazar.
 """
 

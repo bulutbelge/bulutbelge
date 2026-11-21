@@ -1,4 +1,4 @@
-"""İşlem günlüğü (TAKIP 1.38) ve ajan komutu (TAKIP 1.37). Tüm veriler sahtedir."""
+"""İşlem günlüğü ve ajan komutu. Tüm veriler sahtedir."""
 
 import io
 import json

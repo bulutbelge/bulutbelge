@@ -1,5 +1,5 @@
 """İşlem günlüğü: motorun okuma ve maskeleme işlemlerini çekirdeğin hash zincirli
-günlüğüne yazar (TAKIP 1.38). Günlük veri klasöründedir (BULUTBELGE_DATA_DIR).
+günlüğüne yazar. Günlük veri klasöründedir (BULUTBELGE_DATA_DIR).
 
 Kural: günlük yazılamıyorsa işlem yapılmaz. İşlemden önce günlüğün yazılabildiği
 denetlenir; işlem bittikten sonra kayıt eklenemezse sonuç döndürülmez, maskeli

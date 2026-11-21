@@ -164,7 +164,7 @@ def header_key(header: str) -> str:
     return "".join(ch for ch in folded if ch.isalnum())
 
 
-# Yerleşik varsayılan sütun başlığı sözlüğü (TAKIP 1.105): veri türü → başlıklar. Tam eşleşme
+# Yerleşik varsayılan sütun başlığı sözlüğü: veri türü → başlıklar. Tam eşleşme
 # aranır (header_key ile; büyük/küçük harf, boşluk/alt çizgi/tire ve Türkçe karakter duyarsız);
 # "adres_tipi" gibi bileşik başlıklar eşleşmez.
 DEFAULT_COLUMN_HEADERS: dict[str, tuple[str, ...]] = {

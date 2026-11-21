@@ -1,4 +1,4 @@
-"""Uygulama dışarıya ağ bağlantısı kurmaz (TAKIP 1.90, "gizlilik sözü" denetimi).
+"""Uygulama dışarıya ağ bağlantısı kurmaz ("gizlilik sözü" denetimi).
 
 Çekirdek ve masaüstü motoru Python kodu ağ modülü içe aktarmaz; masaüstü kurum sunucusuna hiçbir istek atmaz
 (karar 17 Kasım 2026, "masaüstü ve sunucu ayrı"). Rust tarafında yalnızca güncelleme denetimi

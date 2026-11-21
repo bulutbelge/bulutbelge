@@ -1,4 +1,4 @@
-"""Örnek belgeleri maskeleyip maskeli kopyada orijinal değer arar (TAKIP 1.80'in ilk adımı).
+"""Örnek belgeleri maskeleyip maskeli kopyada orijinal değer arar.
 
 Kullanım (desktop/engine/.venv içindeki Python ile, repo kökünden):
 

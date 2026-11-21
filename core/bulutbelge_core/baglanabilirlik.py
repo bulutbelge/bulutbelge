@@ -1,4 +1,4 @@
-"""Çok belge bağlanabilirlik uyarısı (TAKIP 1.71).
+"""Çok belge bağlanabilirlik uyarısı.
 
 Aynı işte birden fazla belge maskelenip birlikte gönderilirse, belgelerde ORTAK kalan
 dolaylı tanımlayıcılar (aynı il, tarih, meslek, unvan+kurum, yaş) ve aynı takma ad

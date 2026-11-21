@@ -108,7 +108,7 @@ def test_leftover_warning_when_signature_not_removed(signed_pdf, tmp_path):
     assert _signature_leftover_warnings(out.target, before) == []
 
 
-# --- Etiketsiz imza ve kaşe (TAKIP 1.11) ---
+# --- Etiketsiz imza ve kaşe ---
 
 
 def _etiketsiz_pdf(tmp_path, logo_alta=False, cizgisiz=False):

@@ -1,4 +1,4 @@
-"""Yeniden tanınabilirlik skoru (TAKIP 1.70).
+"""Yeniden tanınabilirlik skoru.
 
 Maskeli kopyada kalan dolaylı tanımlayıcıları (il, yaş, tarih, meslek, unvan+kurum) sayar ve
 birleşik etkilerini basit, açıklanabilir bir puana çevirir. Tek başına zararsız görünen

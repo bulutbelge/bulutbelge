@@ -1,4 +1,4 @@
-# Yalnızca Windows'ta PyInstaller'ın gerek duyduğu paketler (TAKIP 1.106). requirements.lock Linux'ta
+# Yalnızca Windows'ta PyInstaller'ın gerek duyduğu paketler. requirements.lock Linux'ta
 # üretildiği için bunları içermez. `pip install --require-hashes -r requirements-windows.lock` ile kurulur.
 pefile==2024.8.26 \
     --hash=sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f \

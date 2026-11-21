@@ -140,7 +140,7 @@ def _finding_json(id_: str, f: Any, replacement: str) -> dict[str, Any]:
 
 
 def doc_scan(params: dict[str, Any]) -> dict[str, Any]:
-    """Belgeyi tarar; işlem günlüğüne "okuma" olarak girer (TAKIP 1.38)."""
+    """Belgeyi tarar; işlem günlüğüne "okuma" olarak girer."""
     path = _require_str(params, "path")
     return journal.run(
         "okuma",
@@ -155,9 +155,9 @@ def doc_scan(params: dict[str, Any]) -> dict[str, Any]:
 def _doc_scan(params: dict[str, Any]) -> dict[str, Any]:
     path = _require_str(params, "path")
     result = _doc_scan_body(params, path)
-    # KVKK m.6 özel nitelikli veri uyarısı: bulgu değil, uyarı (TAKIP 1.46).
+    # KVKK m.6 özel nitelikli veri uyarısı: bulgu değil, uyarı.
     result["warnings"] = [*result["warnings"], *special_warnings(scan_document(path))]
-    # Dosya adı hijyeni (TAKIP 1.60): ad kişi adı taşıyorsa uyarı ve adsız çıktı adı önerisi.
+    # Dosya adı hijyeni: ad kişi adı taşıyorsa uyarı ve adsız çıktı adı önerisi.
     suggested = suggest_masked_name(path)
     if suggested:
         result["warnings"] = [
@@ -322,7 +322,7 @@ def doc_mask(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def _purpose(params: dict[str, Any]) -> str | None:
-    """Gizleme gerekçesi: günlüğe ve rapora yazılır, boşsa yazılmaz (TAKIP 1.44)."""
+    """Gizleme gerekçesi: günlüğe ve rapora yazılır, boşsa yazılmaz."""
     raw = params.get("purpose")
     if raw is not None and not isinstance(raw, str):
         raise EngineError("invalid_params", "'purpose' metin olmalı")
@@ -337,7 +337,7 @@ def _purpose(params: dict[str, Any]) -> str | None:
 
 
 def purposes_list(_params: dict[str, Any]) -> list[dict[str, str]]:
-    """Amaç listesi ve her biri için önerilen profil kimliği (TAKIP 1.29)."""
+    """Amaç listesi ve her biri için önerilen profil kimliği."""
     return amac.purposes()
 
 
@@ -347,7 +347,7 @@ def _watermark(params: dict[str, Any], source: str) -> bool:
 
 
 def _write_report(params: dict[str, Any], source: str, purpose: str | None, result: dict[str, Any]) -> str:
-    """Değersiz gizleme raporunu maskeli kopyanın yanına yazar (TAKIP 1.66)."""
+    """Değersiz gizleme raporunu maskeli kopyanın yanına yazar."""
     target = result["target"]
     try:
         return write_report(
@@ -381,7 +381,7 @@ def _doc_mask_checked(params: dict[str, Any]) -> dict[str, Any]:
             "Güvenlik › Dosyalar ve Klasörler bölümünden BulutBelge'ye izin verin.",
         ) from None
     out = Path(result["target"])
-    # Yazıldığı söylenen dosya gerçekten orada mı (Mac'te "seçilen yere kaydedilmedi" bildirimi, TAKIP 1.36).
+    # Yazıldığı söylenen dosya gerçekten orada mı (Mac'te "seçilen yere kaydedilmedi" bildirimi).
     if not out.is_file():
         raise EngineError("write_failed", "Kopya kaydedilemedi: dosya hedef klasörde bulunamadı")
     result["target"] = str(out)
@@ -619,7 +619,7 @@ def batch_plan(params: dict[str, Any]) -> dict[str, Any]:
 
 @_user_errors
 def batch_linkability(params: dict[str, Any]) -> dict[str, Any]:
-    """Aynı işte maskelenen kopyalar arasında ortak kalan dolaylı tanımlayıcı/takma ad uyarısı (TAKIP 1.71).
+    """Aynı işte maskelenen kopyalar arasında ortak kalan dolaylı tanımlayıcı/takma ad uyarısı.
 
     Yalnızca tür adı ve sayı döner; değer dönmez. Tek belgede ya da risk yokken uyarı listesi boştur.
     """
@@ -683,7 +683,7 @@ def _text_scan(params: dict[str, Any]) -> dict[str, Any]:
             }
             for p in found
         ],
-        # KVKK m.6 ipucu (TAKIP 1.46): yalnızca kategori ve sayı; eşleşen sözcük döndürülmez.
+        # KVKK m.6 ipucu: yalnızca kategori ve sayı; eşleşen sözcük döndürülmez.
         "warnings": special_warnings(scan_special(text)),
     }
 

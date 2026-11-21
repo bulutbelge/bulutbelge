@@ -1,4 +1,4 @@
-"""Maskelemeyi zorlayan sahte örnek belgeler üretir (TAKIP 1.57, 1.58, 1.60, 1.62, 1.74).
+"""Maskelemeyi zorlayan sahte örnek belgeler üretir.
 
 Kullanım (desktop/engine/.venv içindeki Python ile, repo kökünden):
 

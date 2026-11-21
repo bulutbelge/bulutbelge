@@ -1,4 +1,4 @@
-"""Sahte Türkçe örnek set uçtan uca (TAKIP 1.2): üretici → maskeleme → kaçak denetimi. Yalnızca sahte değer."""
+"""Sahte Türkçe örnek set uçtan uca: üretici → maskeleme → kaçak denetimi. Yalnızca sahte değer."""
 
 import json
 import sys

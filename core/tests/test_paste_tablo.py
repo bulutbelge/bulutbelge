@@ -1,4 +1,4 @@
-"""Metin ucunda ayraçlı tablo (TAKIP 1.104). Tüm veriler sahtedir."""
+"""Metin ucunda ayraçlı tablo. Tüm veriler sahtedir."""
 
 from bulutbelge_core.paste import clean_text, is_delimited_table, scan_paste
 from bulutbelge_core.rules import Rules

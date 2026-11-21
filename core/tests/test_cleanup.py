@@ -1,4 +1,4 @@
-"""Temizlik özeti (TAKIP 1.67): yalnızca sahte yazar ve yorumlarla."""
+"""Temizlik özeti: yalnızca sahte yazar ve yorumlarla."""
 
 import docx
 import openpyxl

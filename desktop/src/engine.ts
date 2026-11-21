@@ -65,14 +65,14 @@ export interface Rules {
   terms: string[];
   patterns: CustomPattern[];
   whitelist: string[];
-  /** Kurum sözlüğü: kurum adları ve genel unvanlar; kişi adı/adres bulgusu bunların içindeyse atlanır (TAKIP 1.4). */
+  /** Kurum sözlüğü: kurum adları ve genel unvanlar; kişi adı/adres bulgusu bunların içindeyse atlanır. */
   institutions?: string[];
-  /** Excel/CSV sütun kuralları: başlık → tür (ya da eylem); TAKIP 1.31. */
+  /** Excel/CSV sütun kuralları: başlık → tür (ya da eylem). */
   column_rules?: ColumnRule[];
   signature_labels: string[];
-  /** Takma ad kapsamı: yoksa ortak; "belge" ise her belgede yeni numara (TAKIP 1.68). */
+  /** Takma ad kapsamı: yoksa ortak; "belge" ise her belgede yeni numara. */
   pseudonym_scope?: "belge";
-  /** Kural takımının adı; yalnızca işlem günlüğüne yazılır (TAKIP 1.38). */
+  /** Kural takımının adı; yalnızca işlem günlüğüne yazılır. */
   profile_name?: string;
 }
 

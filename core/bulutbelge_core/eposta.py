@@ -1,4 +1,4 @@
-"""E-posta dosyaları (.eml): başlıklar, gövde ve ekler (TAKIP 1.45).
+"""E-posta dosyaları (.eml): başlıklar, gövde ve ekler.
 
 Yalnızca standart kütüphane (`email`) kullanılır. `.msg` (Outlook, OLE) kapsam dışıdır.
 

@@ -1,4 +1,4 @@
-"""Tür bazında duyarlılık ve kaçırma oranı ölçer (TAKIP 1.61). Yalnızca sahte veri kullanır.
+"""Tür bazında duyarlılık ve kaçırma oranı ölçer. Yalnızca sahte veri kullanır.
 
 Kullanım (repo kökünden, motorun Python'uyla):
 

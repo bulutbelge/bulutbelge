@@ -1,4 +1,4 @@
-"""Geçici klasörler (TAKIP 1.73): işlenirken kısa süre maskesiz içerik barındırabilirler (arşiv içinden çıkarılan
+"""Geçici klasörler: işlenirken kısa süre maskesiz içerik barındırabilirler (arşiv içinden çıkarılan
 dosya, e-posta eki, Office içindeki görsel).
 
 Klasör adı ".noindex" ile biter: macOS Spotlight bu adlı klasörleri dizinlemez, bu yüzden maskesiz içerik aranabilir

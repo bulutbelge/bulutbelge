@@ -124,7 +124,7 @@ def test_old_doc_extension_is_rejected_with_message(tmp_path):
 
 
 def test_attribute_texts_are_masked(tmp_path):
-    """Görsel alternatif metni ve köprü ipucundaki kişisel veri de maskelenir (TAKIP 1.57)."""
+    """Görsel alternatif metni ve köprü ipucundaki kişisel veri de maskelenir."""
     from docx.oxml import parse_xml
     from docx.oxml.ns import nsdecls
 

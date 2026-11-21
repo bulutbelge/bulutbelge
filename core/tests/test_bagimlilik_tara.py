@@ -1,4 +1,4 @@
-"""Bağımlılık taraması betiği (TAKIP 1.88): SBOM üretimi ve ağ yoksa atlama. Yalnızca sahte veri."""
+"""Bağımlılık taraması betiği: SBOM üretimi ve ağ yoksa atlama. Yalnızca sahte veri."""
 import importlib.util
 import json
 from pathlib import Path

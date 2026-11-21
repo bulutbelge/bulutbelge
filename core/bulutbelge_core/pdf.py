@@ -177,7 +177,7 @@ def _open(path: str | os.PathLike) -> pymupdf.Document:
 
 
 def _flatten_doc(doc: pymupdf.Document) -> pymupdf.Document:
-    """Her sayfayı görüntüye çevirip yalnızca görüntü içeren yeni bir belge döndürür (TAKIP 1.63).
+    """Her sayfayı görüntüye çevirip yalnızca görüntü içeren yeni bir belge döndürür.
 
     Metin katmanı, gizli metin, yorum, form alanı, ek ve meta veri yeni belgeye geçmez; sayfada
     görünenler pikseldir. Maskeleme bu görüntüler OCR ile okunarak yapılır. Açıklamalar
@@ -291,7 +291,7 @@ def _add_stamps(
     rules: Rules,
     previews: bool,
 ) -> None:
-    """Etiketsiz renkli kaşe/imza lekelerini (TAKIP 1.11, 1.17) önerilen bulgu olarak ekler."""
+    """Etiketsiz renkli kaşe/imza lekelerini önerilen bulgu olarak ekler."""
     for i, region in enumerate(stamps):
         if any((region.rect & k).get_area() > 0.3 * region.rect.get_area() for k in known):
             continue
@@ -429,7 +429,7 @@ def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image
         if signatures_on:
             labeled = find_signatures(page, rules.signature_labels)
             unlabeled_on = any(lbl.strip() for lbl in rules.signature_labels)  # etiket listesi boşsa imza aranmaz
-            # Etiketsiz imza (TAKIP 1.11): temkinli sezgi; etiketli bulgular önceliklidir.
+            # Etiketsiz imza: temkinli sezgi; etiketli bulgular önceliklidir.
             if unlabeled_on:
                 labeled += find_unlabeled_signatures(
                     page, [r.rect for r in labeled], [pymupdf.Rect(w[:4]) for w in page.get_text("words")]
@@ -505,7 +505,7 @@ def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image
             tp = ocr_textpage(page, image)
             text, boxes = _page_text(page, tp)
             ocr_pages.append(index + 1)
-            # Etiketsiz renkli kaşe/imza lekesi (TAKIP 1.11); etiketli arama aşağıda yine çalışır.
+            # Etiketsiz renkli kaşe/imza lekesi; etiketli arama aşağıda yine çalışır.
             stamps = []
             if rules.types["imza"].enabled and any(lbl.strip() for lbl in rules.signature_labels):
                 stamps = find_scanned_stamps(page, [], _gercek_yazi_kutulari(page, tp))
@@ -759,14 +759,14 @@ def mask_pdf(
     `make_dirs`: hedef klasör yoksa oluştur (klasörle toplu işlemde alt klasörler için).
 
     `counts`: verilirse maskelenen bulgular tür bazında sayılıp buraya yazılır (işlem günlüğü için).
-    `watermark`: her sayfaya soluk, köşegen "MASKELİ KOPYA" yazısı eklenir (isteğe bağlı, TAKIP 1.30).
+    `watermark`: her sayfaya soluk, köşegen "MASKELİ KOPYA" yazısı eklenir (isteğe bağlı).
 
     `mask_pages`: yalnız bu sayfalar maskelenir ("4-6", "1, 4-5, 7", "tek", "cift"; ya da sayı listesi); diğer
     sayfalar olduğu gibi kalır. `exclude_pages`: bu sayfalar maskelenmez (önce `mask_pages` uygulanır).
     `strip_bookmarks`: yer imleri (başlıklar kişisel veri taşıyabilir) kopyadan silinir; False ile korunur.
 
     `flatten`: yüksek riskli belge için; her sayfa görüntüye çevrilip yeniden OCR ile okunur ve
-    maskelenir (TAKIP 1.63). Metin katmanı, gizli metin, açıklama ve ekler kopyaya hiç geçmez.
+    maskelenir. Metin katmanı, gizli metin, açıklama ve ekler kopyaya hiç geçmez.
     OCR dil dosyaları yoksa dosya yazılmaz. Yalnızca PDF'te; görselde yok sayılır (zaten görüntü).
 
     Orijinal dosyaya dokunulmaz. Hedef var olan bir dosyaysa yeni bir ad seçilir.
@@ -825,7 +825,7 @@ def mask_pdf(
                 "Bunları listeden çıkarıp elle kontrol edin."
             )
 
-        # Girdideki imza mürekkebi, silmeden önce bellekte saklanır; çıktıyla karşılaştırılacak (TAKIP 1.76).
+        # Girdideki imza mürekkebi, silmeden önce bellekte saklanır; çıktıyla karşılaştırılacak.
         sig_before = [
             (f, snap)
             for f in included
@@ -847,8 +847,8 @@ def mask_pdf(
         max_font = 11.0 if not image else max(11.0, doc[0].rect.width / 60)
         blurs: list[tuple[int, pymupdf.Rect, str]] = []
         labels: list[tuple[int, pymupdf.Rect, str, float, float]] = []
-        boxes: list[tuple[int, pymupdf.Rect]] = []  # etiketsiz silinen kutular (glif denetimi, TAKIP 1.58)
-        tails: dict[int, list[_TailWord]] = {}  # silinen metnin sağındaki sözcükler (kayma onarımı, TAKIP 1.58)
+        boxes: list[tuple[int, pymupdf.Rect]] = []  # etiketsiz silinen kutular (glif denetimi)
+        tails: dict[int, list[_TailWord]] = {}  # silinen metnin sağındaki sözcükler (kayma onarımı)
         for f in included:
             page = doc[f.page - 1]
             method = rules.method_for(f.finding.type, f.finding.source)
@@ -876,7 +876,7 @@ def mask_pdf(
             for annot in list(page.annots() or []):
                 if annot.type[0] != pymupdf.PDF_ANNOT_REDACT:
                     page.delete_annot(annot)
-            # Form alanı değerleri (ve görünüm akışı) sayfa metni değildir; alan silinir (TAKIP 1.57).
+            # Form alanı değerleri (ve görünüm akışı) sayfa metni değildir; alan silinir.
             for widget in list(page.widgets() or []):
                 page.delete_widget(widget)
             page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_PIXELS)
@@ -908,10 +908,10 @@ def mask_pdf(
 
         # Meta veri, XML meta veri, ekler, JavaScript, form alanları, bağlantılar, gizli metin.
         doc.scrub()
-        _betikleri_temizle(doc)  # scrub katalogdaki OpenAction/AA betiklerini silmez (TAKIP 1.57)
+        _betikleri_temizle(doc)  # scrub katalogdaki OpenAction/AA betiklerini silmez
         doc.set_metadata({})
         if strip_bookmarks:
-            doc.set_toc([])  # yer imi başlıkları kişisel veri taşıyabilir (TAKIP 1.57)
+            doc.set_toc([])  # yer imi başlıkları kişisel veri taşıyabilir
         if watermark:
             _add_watermark(doc)
 
@@ -1217,7 +1217,7 @@ def _tail_words(page: pymupdf.Page, rect: pymupdf.Rect) -> list[_TailWord]:
 
 
 def _restore_shifted(page: pymupdf.Page, tail: list[_TailWord]) -> list[str]:
-    """Silme sonrası sola kayan sözcükleri özgün konumlarına geri koyar (TAKIP 1.58).
+    """Silme sonrası sola kayan sözcükleri özgün konumlarına geri koyar.
 
     MuPDF silinen glifin genişliği kadar sağdaki metni kaydırabilir. Kayan sözcükler silinip aynı
     yerde (yerleşik yazı tipiyle) yeniden yazılır; yazı tipi karakteri çizemiyorsa sözcük kayık kalır
@@ -1257,7 +1257,7 @@ def _restore_shifted(page: pymupdf.Page, tail: list[_TailWord]) -> list[str]:
 
 
 def _verify_glyph_gaps(path: str, boxes: list[tuple[int, pymupdf.Rect]], values: set[str] | None = None) -> list[str]:
-    """Silinen kutuların içinde kalan glifleri denetler (TAKIP 1.58).
+    """Silinen kutuların içinde kalan glifleri denetler.
 
     Metin eşleştirmesi harf harf yerleştirilmiş ya da aralıklı yazılmış değerin artığını kaçırabilir.
     Kutuda kalan karakterler (normalleştirilmiş) maskelenen değerlerden birinin parçasıysa (en az 3
@@ -1300,7 +1300,7 @@ def _verify_glyph_gaps(path: str, boxes: list[tuple[int, pymupdf.Rect]], values:
 
 
 def _gap_width_warnings(included: list[PdfFinding]) -> list[str]:
-    """Kutu ve boşluk genişliği, sonraki metnin kayması değerin uzunluğunu ele verebilir (TAKIP 1.58).
+    """Kutu ve boşluk genişliği, sonraki metnin kayması değerin uzunluğunu ele verebilir.
 
     Değerin yerine kutu konduğunda sonraki metin yerinde kalır; kutu/boşluk genişliği değer
     uzunluğuyla orantılıdır. Uzunluğu değişken türlerde uyarı verilir.

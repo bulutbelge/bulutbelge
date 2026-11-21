@@ -1,4 +1,4 @@
-"""Ajan için komut satırı (TAKIP 1.37, karar: docs/kararlar/2026-11-05-ajan-yerel-kullanim.md).
+"""Ajan için komut satırı (karar: docs/kararlar/2026-11-05-ajan-yerel-kullanim.md).
 
     python -m bulutbelge_engine.cli read  <dosya>  [--profil ID] [--ajan AD] [--json]
     python -m bulutbelge_engine.cli mask  <dosya>  [--hedef YOL] [--profil ID] [--ajan AD] [--json]

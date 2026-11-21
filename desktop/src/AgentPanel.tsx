@@ -13,7 +13,7 @@ interface AgentSettings {
 }
 
 /**
- * Ajan erişimi (TAKIP 1.37): yapay zekâ ajanının komut satırıyla hangi klasörlerde çalışabileceği. Ajan okuma
+ * Ajan erişimi: yapay zekâ ajanının komut satırıyla hangi klasörlerde çalışabileceği. Ajan okuma
  * sonucunu yalnızca maskeli görür; yazma ayrıca açılmadıkça yapılmaz ve her zaman yeni dosyaya yazar. Değişiklik
  * hemen kaydedilir (kural takımlarının Kaydet düğmesinden bağımsız).
  */

@@ -1,4 +1,4 @@
-"""Varsayılan sütun başlığı sözlüğü (TAKIP 1.105). Tüm veriler sahtedir."""
+"""Varsayılan sütun başlığı sözlüğü. Tüm veriler sahtedir."""
 
 from bulutbelge_core.paste import clean_text, scan_paste
 from bulutbelge_core.rules import Rules, header_key

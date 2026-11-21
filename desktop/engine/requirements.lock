@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --generate-hashes --output-file=requirements.lock --strip-extras requirements.in
 #
-# Elle eklenen satırlar (TAKIP 1.106): pefile ve pywin32-ctypes yalnızca Windows'ta PyInstaller'ın
+# Elle eklenen satırlar: pefile ve pywin32-ctypes yalnızca Windows'ta PyInstaller'ın
 # bağımlılığıdır; Linux'ta pip-compile bunları yazmaz. Ortam işaretiyle (sys_platform == "win32") ve
 # PyPI'daki tüm dağıtım dosyalarının (wheel + sdist) sha256 özetleriyle eklendi (pip download ile doğrulandı).
 # Yeniden üretirken bu iki girdiyi korumak gerekir; Linux'ta kurulumda atlanırlar.

@@ -329,7 +329,7 @@ def find_ocr_signatures(
     return _dedupe(regions)
 
 
-# --- Etiketsiz imza ve kaşe (TAKIP 1.11): mürekkep rengi ve şekil sezgisi, temkinli eşikler ---
+# --- Etiketsiz imza ve kaşe: mürekkep rengi ve şekil sezgisi, temkinli eşikler ---
 _ETIKETSIZ_EN_AZ_EGRI = 6  # etiketli aramadan (3) sıkı: yanlış pozitif pahalı
 _MURUKKEP_DOLULUK = (0.02, 0.40)  # mürekkep pikselinin kutuya oranı: düz dolgu (logo) ve boş görsel elenir
 _MURUKKEP_RENK_PAYI = 0.8  # mürekkep piksellerinin bu kadarı kalem/kaşe rengi (mavi, mor, kırmızı, koyu) olmalı

@@ -1,4 +1,4 @@
-"""TAKIP 1.62: kart ve VKN için karışık yazım (noktalı, aralıklı, OCR harfi, satır bölünmesi) ve yanlış pozitif sınırları."""
+"""kart ve VKN için karışık yazım (noktalı, aralıklı, OCR harfi, satır bölünmesi) ve yanlış pozitif sınırları."""
 
 import pytest
 

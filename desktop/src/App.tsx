@@ -221,7 +221,7 @@ function App() {
   const [targetDir, setTargetDir] = useState<string | null>(null);
   const [plan, setPlan] = useState<BatchPlan | null>(null);
   const [batchRunning, setBatchRunning] = useState(false);
-  /** Toplu işlem bitişinde bağlanabilirlik uyarısı (TAKIP 1.71); bilgi verir, engellemez. */
+  /** Toplu işlem bitişinde bağlanabilirlik uyarısı; bilgi verir, engellemez. */
   const [linkability, setLinkability] = useState<{ duzey: string; uyari: string[] } | null>(null);
 
   const [scan, setScan] = useState<ScanResult | null>(null);
@@ -275,7 +275,7 @@ function App() {
   // Kopyanın parolası (yalnızca PDF); yalnızca bellekte, belge değişince silinir.
   const [protect, setProtect] = useState(false);
   const [password, setPassword] = useState("");
-  // Düzleştir modu (TAKIP 1.63): yalnızca tek belge akışında, PDF için.
+  // Düzleştir modu: yalnızca tek belge akışında, PDF için.
   const [flatten, setFlatten] = useState(false);
   // Aynı belge yeniden taranırken seçimler korunsun diye son taranan belge.
   const scannedPath = useRef<string | null>(null);
@@ -1485,7 +1485,7 @@ function App() {
         onRemove={(w) => updateExtra({ terms: extra.terms.filter((x) => x !== w) })}
       />
     ),
-    // Parolalı kopya (TAKIP 1.81, karar: 2026-11-07-parolali-kopya-kalacak.md); yalnızca PDF.
+    // Parolalı kopya (karar: 2026-11-07-parolali-kopya-kalacak.md); yalnızca PDF.
     passwordNode:
       format === "pdf" ? (
         <>
@@ -2187,7 +2187,7 @@ function SaveLine({ source, target, onChange }: { source: string | null; target:
   const t = useT();
   if (!target) return null;
   const { name, dir } = splitPath(target);
-  // Hedef değiştirildiyse etiket seçilen klasörü söyler (TAKIP 1.75).
+  // Hedef değiştirildiyse etiket seçilen klasörü söyler.
   const yaninda = !source || splitPath(source).dir.toLowerCase() === dir.toLowerCase();
   const klasor = splitPath(dir).name || dir;
   return (

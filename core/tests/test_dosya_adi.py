@@ -1,4 +1,4 @@
-"""Dosya adı hijyeni (TAKIP 1.60): yalnızca sahte adlarla."""
+"""Dosya adı hijyeni: yalnızca sahte adlarla."""
 
 from bulutbelge_core.dosya_adi import has_person_name, scrub_name, scrub_path, suggest_masked_name
 

@@ -1,4 +1,4 @@
-# Gitleaks ayarı (TAKIP T3): varsayılan kurallar + testlerdeki sahte parola.
+# Gitleaks ayarı: varsayılan kurallar + testlerdeki sahte parola.
 title = "BulutBelge gitleaks"
 
 [extend]

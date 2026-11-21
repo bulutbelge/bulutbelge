@@ -1,4 +1,4 @@
-"""Kişi adı kaçırma ölçümü (TAKIP 1.47). Yalnızca uydurma ad ve soyad kullanır; değer yazdırmaz.
+"""Kişi adı kaçırma ölçümü. Yalnızca uydurma ad ve soyad kullanır; değer yazdırmaz.
 
 Kullanım (core/ içinden): python tools/ad_olcum.py
 """

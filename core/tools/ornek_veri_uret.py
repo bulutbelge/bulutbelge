@@ -53,7 +53,7 @@ from fake_data import fake_card, fake_iban, fake_tc, fake_vkn  # noqa: E402
 from fake_face import draw_face  # noqa: E402  (çizim; gerçek kişiye ait değil)
 
 def _font_path(bold: bool = False) -> str:
-    """Türkçe karakterli bir TrueType yazı tipi: Windows, macOS ya da Linux (TAKIP 1.79)."""
+    """Türkçe karakterli bir TrueType yazı tipi: Windows, macOS ya da Linux."""
     candidates = (
         [r"C:\Windows\Fonts\arialbd.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
          "/Library/Fonts/Arial Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -590,7 +590,7 @@ def application_file(out: Path) -> None:
 
 
 def beklenen_yaz(out: Path) -> None:
-    """Metin katmanı olan belgeler için `beklenen.json` yazar (kacak_kontrol.py girdisi, TAKIP 1.2).
+    """Metin katmanı olan belgeler için `beklenen.json` yazar (kacak_kontrol.py girdisi).
 
     Değerler sahtedir; maskeli kopyada hiçbirinin kalmaması beklenir.
     """
