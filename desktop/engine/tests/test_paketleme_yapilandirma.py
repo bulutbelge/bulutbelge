@@ -90,3 +90,11 @@ def test_paketler_lisans_metinlerini_ve_aciklamayi_tasir():
         assert kaynaklar[f"../../{ad}"] == f"licenses/{ad}"
         assert (TAURI / f"../../{ad}").resolve().is_file()
     assert kaynaklar["binaries/engine/"] == "engine/"
+
+
+def test_webview2_arka_plan_agi_kapali_bayraklarla_baslar():
+    """W.1: WebView2'nin kendi arka plan trafiği (güncelleme, eşitleme, ping) kısılır; Tauri'nin varsayılan bayrakları korunur."""
+    pencere = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))["app"]["windows"][0]
+    bayraklar = pencere["additionalBrowserArgs"]
+    for b in ("msWebOOUI", "msPdfOOUI", "msSmartScreenProtection", "--disable-background-networking", "--disable-component-update", "--no-pings", "--disable-sync"):
+        assert b in bayraklar
