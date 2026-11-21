@@ -47,34 +47,33 @@ jobs:
       - run: python -m pytest -q
         working-directory: desktop/engine
 
+  # Matris önceden hazırlanır: `exclude` + `include` birlikte kullanılınca include satırı dışlanan
+  # macOS'u yeni bir kombinasyon olarak geri ekliyordu (macOS her elle çalıştırmada derleniyordu).
+  matris:
+    name: Derleme planı
+    runs-on: ubuntu-22.04
+    outputs:
+      include: ${{ steps.plan.outputs.include }}
+    steps:
+      - id: plan
+        env:
+          # Etikette her zaman; elle çalıştırmada yalnızca macos kutusu işaretliyse.
+          MACOS: ${{ github.event_name != 'workflow_dispatch' || inputs.macos }}
+        run: |
+          win='{"ad":"windows","calistirici":"windows-latest","hedef":"x86_64-pc-windows-msvc","ek_kilit":"requirements-windows.lock","paketler":"msi nsis"}'
+          mac='{"ad":"macos","calistirici":"macos-latest","hedef":"aarch64-apple-darwin","ek_kilit":"requirements-macos.lock","paketler":"dmg"}'
+          lin='{"ad":"linux","calistirici":"ubuntu-22.04","hedef":"x86_64-unknown-linux-gnu","ek_kilit":"","paketler":"deb appimage"}'
+          if [ "$MACOS" = "true" ]; then liste="[$win,$mac,$lin]"; else liste="[$win,$lin]"; fi
+          echo "include=$liste" >> "$GITHUB_OUTPUT"
+
   derle:
     name: Derleme (${{ matrix.ad }})
-    needs: test
+    needs: [test, matris]
     runs-on: ${{ matrix.calistirici }}
     strategy:
       fail-fast: false
       matrix:
-        # Elle çalıştırmada macOS isteğe bağlı (ilk sürüm Windows); etikette her zaman derlenir.
-        # exclude yalnızca temel boyuta uygulanır; include satırları ad eşleşmesiyle özellik ekler.
-        ad: [windows, macos, linux]
-        exclude:
-          - ad: ${{ (github.event_name == 'workflow_dispatch' && !inputs.macos) && 'macos' || 'yok' }}
-        include:
-          - ad: windows
-            calistirici: windows-latest
-            hedef: x86_64-pc-windows-msvc
-            ek_kilit: requirements-windows.lock
-            paketler: "msi nsis"
-          - ad: macos
-            calistirici: macos-latest
-            hedef: aarch64-apple-darwin
-            ek_kilit: requirements-macos.lock
-            paketler: "dmg"
-          - ad: linux
-            calistirici: ubuntu-22.04
-            hedef: x86_64-unknown-linux-gnu
-            ek_kilit: ""
-            paketler: "deb appimage"
+        include: ${{ fromJSON(needs.matris.outputs.include) }}
     defaults:
       run:
         shell: bash

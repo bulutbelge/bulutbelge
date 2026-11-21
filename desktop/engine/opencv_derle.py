@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -79,6 +80,30 @@ def ffmpegsiz_mi() -> bool:
     return not re.search(r"FFMPEG:\s+YES", bilgi)
 
 
+# opencv-python'ın setup.py dosyası Windows'ta FFmpeg DLL'ini zorunlu paket dosyası sayar; FFmpeg'siz
+# derlemede dosya olmadığı için paketleme "Not found" ile durur. Bu kural kaldırılır (diğer platformlarda
+# zaten boştur). Yama tutmazsa (ör. yeni sürümde satır değiştiyse) derleme bilerek durur.
+FFMPEG_DLL_KURALI = '[r"bin/opencv_videoio_ffmpeg\\d{4}%s\\.dll" % ("_64" if is64 else "")]'
+
+
+def kaynagi_ac_ve_yamala(arsiv: Path, hedef: Path) -> Path:
+    """Özeti doğrulanmış arşivi açar, setup.py'deki FFmpeg DLL kuralını kaldırır, kaynak klasörünü döndürür."""
+    import tarfile
+
+    if hedef.exists():
+        shutil.rmtree(hedef)
+    hedef.mkdir(parents=True)
+    with tarfile.open(arsiv) as tar:
+        tar.extractall(hedef, filter="data")
+    kok = next(p for p in hedef.iterdir() if p.is_dir())
+    setup = kok / "setup.py"
+    metin = setup.read_text(encoding="utf-8")
+    if metin.count(FFMPEG_DLL_KURALI) != 1:
+        raise SystemExit("setup.py'de FFmpeg DLL kuralı beklenen biçimde bulunamadı; opencv_derle.py güncellenmeli")
+    setup.write_text(metin.replace(FFMPEG_DLL_KURALI, "[]"), encoding="utf-8")
+    return kok
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--onbellek", type=Path, default=Path.home() / ".cache" / "bb-opencv")
@@ -92,14 +117,16 @@ def main() -> None:
     tekerlek = next(klasor.glob("*.whl"), None)
     if tekerlek is None:
         arsiv = kaynagi_indir(surum, izinli, klasor)
+        kaynak = kaynagi_ac_ve_yamala(arsiv, klasor / "kaynak")
         ortam = dict(os.environ, ENABLE_HEADLESS="1", CMAKE_ARGS=CMAKE_ARGS)
         if sys.platform == "darwin":
             ortam.setdefault("MACOSX_DEPLOYMENT_TARGET", "13.0")
         print(f"{PAKET} {surum} kaynaktan derleniyor (FFmpeg'siz); bu birkaç on dakika sürebilir", flush=True)
         subprocess.run(
-            [sys.executable, "-m", "pip", "wheel", "--no-deps", "--no-cache-dir", str(arsiv), "-w", str(klasor)],
+            [sys.executable, "-m", "pip", "wheel", "--no-deps", "--no-cache-dir", str(kaynak), "-w", str(klasor)],
             env=ortam, check=True,
         )
+        shutil.rmtree(kaynak.parent, ignore_errors=True)
         tekerlek = next(klasor.glob("*.whl"))
     else:
         print(f"Önbellekteki tekerlek kullanılıyor: {tekerlek.name}", flush=True)
