@@ -46,6 +46,7 @@ export default {
   "Okuma": "Read",
   "Maskeleme": "Masking",
   "Maske kaldırma": "Unmasking",
+  "Ayar değişikliği": "Settings change",
   "Dışa aktarma": "Export",
   "Başarılı": "Successful",
   "Hata": "Error",

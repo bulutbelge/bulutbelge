@@ -53,6 +53,8 @@ Paylaşımlı ya da ikili lisanslı Rust ve JavaScript bileşenleri:
 
 `opencv-python-headless` 4.14.0.94, PyPI'daki kaynak arşivinden (SHA-256 özeti `desktop/engine/requirements.lock` ile doğrulanır) **FFmpeg, GStreamer ve Intel IPP olmadan** derlenir (`desktop/engine/opencv_derle.py`). BulutBelge video işlemez; bu yapı FFmpeg'i ve onun GPL ya da LGPL lisanslı kodeklerini içermez. OpenCV'nin kendi içinde derlenen yardımcı kütüphaneler (ör. libjpeg-turbo, libpng, libtiff, libwebp, OpenJPEG, zlib) izin veren lisanslıdır. Tekerleğin lisans dosyaları kurulum klasöründe `engine/_internal/cv2/` altındadır (`LICENSE.txt`, `LICENSE-3RD-PARTY.txt`); ikincisi PyPI tekerleği için yazılmış genel bir metindir ve bu yapıda bulunmayan FFmpeg'i de anar. Paketleme betiği, FFmpeg kütüphanelerinden biri pakette bulunursa derlemeyi durdurur.
 
+Sunucu imajı da aynı betik ve kilitle, ayrı bir derleme aşamasında FFmpeg'siz OpenCV kurar (`server/Dockerfile`); derleme araçları son imaja girmez ve imaj, OpenCV FFmpeg ile derlenmişse oluşturulmaz.
+
 Kaynak kodu: <https://github.com/opencv/opencv-python> (sürüm 4.14.0.94) ve <https://github.com/opencv/opencv>.
 
 ## Derleme araçları

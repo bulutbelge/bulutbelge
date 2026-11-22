@@ -1,8 +1,8 @@
-"""Ajan komut satırı kılavuzu (docs/AJAN-KOMUT-SATIRI.md'nin paketteki kopyası: kilavuz.md).
+"""Ajan komut satırı kılavuzu (kilavuz.md: kılavuzun TEK kaynağı, 22 Kasım 2026 kararı).
 
 Kılavuz motorun içinde gelir; böylece kurulu uygulamada internet ya da repo olmadan
-`bulutbelge kilavuz` ile okunur. Kaynak `docs/AJAN-KOMUT-SATIRI.md`; kopyalar
-`desktop/scripts/kilavuz-esitle.py` ile eşitlenir (testler farkı yakalar).
+`bulutbelge kilavuz` ile okunur. Kopyalar (`docs/AJAN-KOMUT-SATIRI.md`, `site/ajan.md`, `site/ajan.html`)
+`desktop/scripts/kilavuz-esitle.py` ile bu dosyadan üretilir (testler farkı yakalar).
 
 Claude Code becerisi `skill/SKILL.md` de paketle gelir: `bulutbelge kilavuz --skill`.
 """

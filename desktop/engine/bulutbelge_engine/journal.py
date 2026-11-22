@@ -7,16 +7,20 @@ kopya yazıldıysa silinir (kaydı olmayan kopya kalmaz).
 
 Günlüğe yol, dosya özeti, tür bazında sayı, profil adı, çağıran ve sonuç girer;
 bulguların değeri, belge içeriği ve hata mesajı girmez (hata yalnızca koduyla).
+Yol ve amaç yazılmadan önce çekirdekle taranır: klasör ve dosya adlarındaki kişi adı ve
+diğer kişisel veriler etikete çevrilir (bağımsız inceleme bulgu 17; sunucudaki 2.18 ile aynı yaklaşım).
 """
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Callable
 
 from bulutbelge_core.audit import AuditError, AuditLog, file_sha256, filter_records, to_csv
+from bulutbelge_core.dosya_adi import mask_log_text
 
 from . import settings
 from .protocol import EngineError
@@ -29,8 +33,34 @@ CALLER: ContextVar[tuple[str, str | None]] = ContextVar("bulutbelge_caller", def
 UNWRITABLE = "İşlem günlüğü yazılamıyor; güvenlik için işlem yapılmadı"
 
 
+def mask_path(path: str | None) -> str | None:
+    """Yolun her parçasını (klasör ve dosya adı) `mask_log_text` ile temizler; ayraçlar ve uzantı korunur."""
+    if not path:
+        return path
+    parts = re.split(r"([/\\])", str(path))
+    for i, part in enumerate(parts):
+        if part in ("/", "\\") or not part:
+            continue
+        if i == 0 and re.fullmatch(r"[A-Za-z]:", part):
+            continue  # Windows sürücü harfi
+        parts[i] = mask_log_text(part, filename=True) or part
+    return "".join(parts)
+
+
+class _MaskedLog(AuditLog):
+    """Kaynak/hedef yolu ve amaç yazılmadan önce maskelenir; zincir ve satır biçimi AuditLog ile aynı."""
+
+    def append(self, op: str, **kw: Any) -> dict[str, Any]:
+        for key in ("source", "target"):
+            if kw.get(key):
+                kw[key] = mask_path(kw[key])
+        if kw.get("purpose"):
+            kw["purpose"] = mask_log_text(kw["purpose"])[:200]
+        return super().append(op, **kw)
+
+
 def log() -> AuditLog:
-    return AuditLog(settings.data_dir() / LOG_FILE)
+    return _MaskedLog(settings.data_dir() / LOG_FILE)
 
 
 def _preflight() -> AuditLog:
@@ -119,6 +149,19 @@ def preview(path: str, fn: Callable[[], dict[str, Any]]) -> dict[str, Any]:
     if key is not None:
         _PREVIEWED.add(key)
     return result
+
+
+def setting_change(what: str, fn: Callable[[], Any], counts: dict[str, int] | None = None) -> Any:
+    """Güvenlik ayarı değişikliği (bulgu 18): "yonetim" kaydı. Değer, klasör yolu, terim, parola yazılmaz;
+    yalnızca neyin değiştiği (`what`) ve sayılar. Günlük yazılamıyorsa değişiklik yapılmaz."""
+    return run(
+        "yonetim",
+        fn,
+        source=f"(ayar) {what}",
+        profile=None,
+        counts_of=lambda _r: dict(counts or {}),
+        hash_source=False,
+    )
 
 
 def unmask(label: Any, fn: Callable[[], dict[str, Any]]) -> dict[str, Any]:

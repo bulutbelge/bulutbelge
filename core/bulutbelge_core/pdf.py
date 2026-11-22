@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -695,7 +696,13 @@ def count_types(counts: dict[str, int], types) -> None:
 
 
 def _normalize(s: str) -> str:
-    return "".join(_DASHES.get(c, c) for c in s if not c.isspace()).casefold()
+    """Kaçak denetimi anahtarı (bütün biçimler bunu kullanır): boşluk ve noktalama atılır, büyük/küçük harf
+    Türkçeye uygun eşlenir (bağımsız inceleme bulgu 20). "YILMAZ", "Yılmaz" ve "yilmaz" aynı anahtara iner
+    ("I".casefold() = "i" ama "ı".casefold() = "ı"; "İ".casefold() = "i" + birleşik nokta). Telefon ya da kimlik
+    numarası noktalı, tireli, parantezli yazılsa da eşleşir. Eşleşme fazlalaşırsa yazma reddedilir (şüphede reddet).
+    """
+    t = "".join(c for c in s if not c.isspace()).casefold().replace("\u0307", "").replace("ı", "i")
+    return "".join(c for c in t if not unicodedata.category(c).startswith("P"))
 
 
 _HELV_SPAN = 1.378  # helv için arama kutusu yüksekliği / yazı boyutu

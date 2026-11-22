@@ -8,7 +8,7 @@ import { Icon } from "./ui";
 export interface LogRecord {
   seq: number;
   at: string;
-  op: "okuma" | "maskeleme" | "disa_aktarma" | "onizleme" | "maske_kaldirma";
+  op: "okuma" | "maskeleme" | "disa_aktarma" | "onizleme" | "maske_kaldirma" | "yonetim";
   source: string | null;
   target: string | null;
   source_sha256: string | null;
@@ -43,6 +43,7 @@ const OPS: Record<string, string> = {
   maskeleme: "Maskeleme",
   maske_kaldirma: "Maske kaldırma",
   disa_aktarma: "Dışa aktarma",
+  yonetim: "Ayar değişikliği",
 };
 const RESULTS: Record<string, string> = { basarili: "Başarılı", hata: "Hata", reddedildi: "Reddedildi" };
 const EMPTY: Filters = { date_from: "", date_to: "", file: "", op: "", caller: "" };

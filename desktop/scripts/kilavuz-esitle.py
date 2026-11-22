@@ -1,7 +1,8 @@
 """Ajan kılavuzunu tek kaynaktan eşitler.
 
-Kaynak: docs/AJAN-KOMUT-SATIRI.md. Kopyalar:
-- desktop/engine/bulutbelge_engine/kilavuz.md  (uygulamayla gelir: `bulutbelge kilavuz`)
+Kaynak: desktop/engine/bulutbelge_engine/kilavuz.md (uygulamayla gelir: `bulutbelge kilavuz`; 22 Kasım 2026
+ürün sahibi kararı, docs/kararlar/2026-11-14-ajan-kilavuzu-konumlari.md "Güncelleme"). Kopyalar:
+- docs/AJAN-KOMUT-SATIRI.md                      (depodaki okunur kopya; README bağlantıları buraya)
 - site/ajan.md                                   (ajanların indirebileceği düz metin)
 - site/ajan.html                                 (insanlar için web sayfası)
 
@@ -17,8 +18,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "docs" / "AJAN-KOMUT-SATIRI.md"
-ENGINE_COPY = ROOT / "desktop" / "engine" / "bulutbelge_engine" / "kilavuz.md"
+SOURCE = ROOT / "desktop" / "engine" / "bulutbelge_engine" / "kilavuz.md"
+DOCS_COPY = ROOT / "docs" / "AJAN-KOMUT-SATIRI.md"
 SITE_MD = ROOT / "site" / "ajan.md"
 SITE_HTML = ROOT / "site" / "ajan.html"
 
@@ -113,7 +114,7 @@ def build_html(md: str) -> str:
 <body>
 <header class="top"><div class="wrap"><a class="logo" href="./"><img class="logo-resim" src="logo.svg" alt="BulutBelge" width="119" height="24"></a><nav><a href="./">Ana sayfa</a> · <a href="ajan.md">Düz metin (ajanlar için)</a></nav></div></header>
 <main><div class="wrap page">
-<!-- Bu sayfa docs/AJAN-KOMUT-SATIRI.md'den desktop/scripts/kilavuz-esitle.py ile üretilir; elle düzenlemeyin. -->
+<!-- Bu sayfa desktop/engine/bulutbelge_engine/kilavuz.md'den desktop/scripts/kilavuz-esitle.py ile üretilir; elle düzenlemeyin. -->
 {body}
 </div></main>
 <footer><div class="wrap"><p><a href="./">Ana sayfa</a> · <a href="kosullar.html">Kullanım Koşulları</a> · <a href="aydinlatma.html">Aydınlatma Metni</a> · <a href="cerez.html">Çerez Politikası</a></p></div></footer>
@@ -124,7 +125,7 @@ def build_html(md: str) -> str:
 
 def outputs() -> dict[Path, str]:
     md = SOURCE.read_text(encoding="utf-8")
-    return {ENGINE_COPY: md, SITE_MD: md, SITE_HTML: build_html(md)}
+    return {DOCS_COPY: md, SITE_MD: md, SITE_HTML: build_html(md)}
 
 
 def main() -> int:

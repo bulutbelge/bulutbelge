@@ -692,7 +692,9 @@ def _text_scan(params: dict[str, Any]) -> dict[str, Any]:
 
 def allow_add(params: dict[str, Any]) -> list[dict[str, Any]]:
     """"Bunu bir daha hiç gizleme": değerin yalnızca özeti saklanır."""
-    return settings.allow_add(params.get("values"), params.get("type"))
+    values = params.get("values")
+    n = len(values) if isinstance(values, list) else 0
+    return journal.setting_change("istisna ekleme", lambda: settings.allow_add(values, params.get("type")), {"deger": n})
 
 
 def allow_list(_params: dict[str, Any]) -> list[dict[str, Any]]:
@@ -700,7 +702,8 @@ def allow_list(_params: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def allow_remove(params: dict[str, Any]) -> list[dict[str, Any]]:
-    return settings.allow_remove(params.get("id"))
+    item = params.get("id")
+    return journal.setting_change("istisna silme" if item != "*" else "istisnaların tümünü silme", lambda: settings.allow_remove(item))
 
 
 def history_list(_params: dict[str, Any]) -> list[dict[str, Any]]:
@@ -712,11 +715,11 @@ def history_add(params: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def history_delete(params: dict[str, Any]) -> list[dict[str, Any]]:
-    return settings.history_delete(params)
+    return journal.setting_change("son yapılanlardan silme", lambda: settings.history_delete(params))
 
 
 def history_clear(_params: dict[str, Any]) -> list[dict[str, Any]]:
-    return settings.history_clear()
+    return journal.setting_change("son yapılanları temizleme", settings.history_clear)
 
 
 def settings_get(_params: dict[str, Any]) -> dict[str, Any]:
@@ -724,7 +727,9 @@ def settings_get(_params: dict[str, Any]) -> dict[str, Any]:
 
 
 def settings_save(params: dict[str, Any]) -> dict[str, Any]:
-    return settings.save_settings(params)
+    raw = params.get("profiles")
+    n = len(raw) if isinstance(raw, list) else 0
+    return journal.setting_change("kural takımları ve ayarlar", lambda: settings.save_settings(params), {"kural_takimi": n})
 
 
 def profiles_export(params: dict[str, Any]) -> dict[str, Any]:
@@ -732,11 +737,11 @@ def profiles_export(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def profiles_import(params: dict[str, Any]) -> dict[str, Any]:
-    return settings.import_profiles(params)
+    return journal.setting_change("kural takımı içe aktarma", lambda: settings.import_profiles(params))
 
 
 def vault_create(params: dict[str, Any]) -> dict[str, Any]:
-    return settings.VAULT.create(params.get("password"))
+    return journal.setting_change("kasa oluşturma", lambda: settings.VAULT.create(params.get("password")))
 
 
 def vault_unlock(params: dict[str, Any]) -> dict[str, Any]:
@@ -744,11 +749,13 @@ def vault_unlock(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def vault_save(params: dict[str, Any]) -> dict[str, Any]:
-    return settings.VAULT.save(params.get("terms"))
+    terms = params.get("terms")
+    n = sum(len(v) for v in terms.values() if isinstance(v, list)) if isinstance(terms, dict) else 0
+    return journal.setting_change("kasa terimleri", lambda: settings.VAULT.save(terms), {"terim": n})
 
 
 def vault_change_password(params: dict[str, Any]) -> dict[str, bool]:
-    return settings.VAULT.change_password(params.get("password"))
+    return journal.setting_change("kasa parolası değiştirme", lambda: settings.VAULT.change_password(params.get("password")))
 
 
 def vault_lock(_params: dict[str, Any]) -> dict[str, bool]:
@@ -772,11 +779,11 @@ def vault_pseudonym_restore_text(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def vault_pseudonym_clear(_params: dict[str, Any]) -> dict[str, Any]:
-    return settings.VAULT.pseudonym_clear()
+    return journal.setting_change("takma adları silme", settings.VAULT.pseudonym_clear)
 
 
 def vault_delete(_params: dict[str, Any]) -> dict[str, bool]:
-    return settings.VAULT.delete()
+    return journal.setting_change("kasayı silme", settings.VAULT.delete)
 
 
 def log_list(params: dict[str, Any]) -> dict[str, Any]:
@@ -803,4 +810,12 @@ def agent_guide(_params: dict[str, Any]) -> dict[str, str]:
 
 
 def agent_save(params: dict[str, Any]) -> dict[str, Any]:
-    return settings.save_agent(params)
+    """Ajan erişimi değişikliği günlüğe girer: klasör sayısı ve izinler (klasör yolu yazılmaz)."""
+    folders = params.get("folders")
+    counts = {
+        "klasor": len(folders) if isinstance(folders, list) else 0,
+        "yazma_izni": 1 if params.get("allow_write") is True else 0,
+        "kosulsuz": 1 if params.get("allow_without_terms") is True else 0,
+        "kural_takimi_atandi": 1 if params.get("profile") else 0,
+    }
+    return journal.setting_change("ajan erişimi", lambda: settings.save_agent(params), counts)

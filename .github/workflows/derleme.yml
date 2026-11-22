@@ -39,7 +39,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libglib2.0-0 fonts-dejavu-core
-      - run: pip install "./core[dev]" "./desktop/engine[dev]"
+      - name: Test bağımlılıkları (hash'li kilit; bulgu 26)
+        run: |
+          python -m pip install --no-cache-dir --require-hashes -r desktop/engine/requirements.lock -r desktop/engine/requirements-test.lock
+          python -m pip install --no-cache-dir --no-deps --no-build-isolation ./core ./desktop/engine
       - name: OCR dil dosyaları (SHA-256 doğrulamalı; düzleştirme testleri için)
         run: python desktop/engine/tessdata_indir.py
       - run: python -m pytest -q
@@ -125,7 +128,7 @@ jobs:
         run: npm ci
       - name: Uygulamayı derle (Tauri)
         working-directory: desktop
-        run: npx tauri build --config src-tauri/tauri.release.conf.json
+        run: npx tauri build --config src-tauri/tauri.release.conf.json -- --locked
       # İMZA (yer tutucu): SignPath onayı gelince açılır. Gizli değişken adları yalnızca burada
       # anılır; değerleri açık depoda asla yer almaz, GitHub › Settings › Secrets and variables altında tutulur.
       # - name: SignPath ile imzala (Windows)
@@ -148,7 +151,7 @@ jobs:
       - name: Uygulamayı derle, çevrimdışı (Tauri, Windows)
         if: matrix.ad == 'windows'
         working-directory: desktop
-        run: npx tauri build --config src-tauri/tauri.release.conf.json --config src-tauri/tauri.offline.conf.json
+        run: npx tauri build --config src-tauri/tauri.release.conf.json --config src-tauri/tauri.offline.conf.json -- --locked
       - name: Çevrimdışı çıktıları topla (Windows)
         if: matrix.ad == 'windows'
         run: |

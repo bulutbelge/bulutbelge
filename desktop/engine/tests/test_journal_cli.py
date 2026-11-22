@@ -206,8 +206,10 @@ def test_cli_refuses_when_vault_exists_unless_allowed(note):
 
 
 def test_cli_stops_when_log_unwritable(note):
-    allow(note.parent)
-    (settings.data_dir() / journal.LOG_FILE).mkdir()
+    allow(note.parent)  # ajan izni de günlüğe girer (bulgu 18); günlük sonradan bozulur
+    gunluk = settings.data_dir() / journal.LOG_FILE
+    gunluk.unlink(missing_ok=True)
+    gunluk.mkdir()
     code, out, err = run_cli("read", str(note))
     assert code == cli.EXIT_LOG and out == "" and "günlüğü" in err
 

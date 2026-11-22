@@ -35,7 +35,7 @@ APP_ID = "com.proteksistem.bulutbelge"
 DEV_ENV = "BULUTBELGE_GELISTIRME"
 EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_REFUSED, EXIT_LOG = 0, 1, 2, 3, 4
 
-# Çıkış kodları: kod -> (anlamı, ajan ne yapmalı). Metinler docs/AJAN-KOMUT-SATIRI.md'deki
+# Çıkış kodları: kod -> (anlamı, ajan ne yapmalı). Metinler bulutbelge_engine/kilavuz.md'deki
 # "Çıkış kodları" tablosuyla birebir aynıdır (test denetler); --help ve man sayfası buradan üretilir.
 EXIT_CODES: dict[int, tuple[str, str]] = {
     EXIT_OK: ("Başarılı", "Devam et"),
