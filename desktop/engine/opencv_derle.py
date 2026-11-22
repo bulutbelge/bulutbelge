@@ -108,6 +108,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--onbellek", type=Path, default=Path.home() / ".cache" / "bb-opencv")
     args = ap.parse_args()
+    # Windows'ta konsol kodlaması cp1252 olabilir; Türkçe ileti çökmeye yol açmasın (koşu 44951966360).
+    for akis in (sys.stdout, sys.stderr):
+        akis.reconfigure(encoding="utf-8", errors="replace")
 
     surum, izinli = kilitten_oku()
     ayar_ozeti = hashlib.sha256(CMAKE_ARGS.encode()).hexdigest()[:12]

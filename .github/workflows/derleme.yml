@@ -24,6 +24,8 @@ concurrency:
 
 env:
   PYTHONHASHSEED: "0"
+  # Windows konsolu cp1252: Türkçe çıktı veren betikler çökmesin.
+  PYTHONUTF8: "1"
 
 jobs:
   test:
