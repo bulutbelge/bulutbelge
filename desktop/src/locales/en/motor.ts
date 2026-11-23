@@ -179,6 +179,12 @@ export default {
   "Zincir kopuk: önceki kayıt silinmiş ya da değiştirilmiş": "Broken chain: the previous entry was deleted or changed",
   "Sıra numarası beklenmeyen": "Unexpected sequence number",
   "Kayıt sonradan değiştirilmiş": "The entry was changed afterwards",
+  "Kayıt mührü (HMAC) tutmuyor: kayıt değiştirilmiş ya da zincir anahtarsız yeniden hesaplanmış": "The entry seal (HMAC) does not match: the entry was changed or the chain was recomputed without the key",
+  "Mühürsüz kayıt: anahtarlı mühür zorunluyken HMAC'siz kayıt eklenmiş": "Unsealed entry: an entry without HMAC was added where the keyed seal is required",
+  "Günlük mühür anahtarı okunamadı": "The log seal key could not be read",
+  "Günlük mühür anahtarı geçersiz": "The log seal key is invalid",
+  "Günlük mühür anahtarı bulunamadı; mühürlü kayıtlar doğrulanamaz. Anahtarı geri koyun ya da eski günlüğü başka bir yere taşıyın": "The log seal key was not found; sealed entries cannot be verified. Restore the key or move the old log elsewhere",
+  "Günlük mühür anahtarı yazılamadı ({tur})": "The log seal key could not be written ({tur})",
 
   // Ayarlar, profil ve kasa (settings.py)
   "Ayar klasörü bilinmiyor": "The settings folder is unknown",

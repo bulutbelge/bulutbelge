@@ -99,7 +99,7 @@ Motorun (Python) ürettiği Türkçe etiket ve uyarılar arayüzde aynı sözlü
 
 ## Güncelleme denetimi
 
-Uygulama açılışta internet varsa `https://bulutbelge.com/surum.json` dosyasını okur (tek GET, veri göndermez) ve yeni sürüm varsa bilgi şeridi gösterir; indirmeyi kullanıcı yapar. Ayarlar'dan kapatılır. Kod: `src-tauri/src/guncelleme.rs`. Her yayında `site/surum.json` güncellenmelidir. Karar: `docs/kararlar/2026-11-13-dil-destegi-ve-guncelleme-denetimi.md`.
+Denetim **varsayılan olarak kapalıdır** (21 Kasım 2026 kararı, `src/guncelleme.tsx`). Kullanıcı Ayarlar'dan açarsa uygulama açılışta internet varsa `https://bulutbelge.com/surum.json` dosyasını okur (tek GET, veri göndermez) ve yeni sürüm varsa bilgi şeridi gösterir; indirmeyi kullanıcı yapar. Kod: `src-tauri/src/guncelleme.rs`. Her yayında `site/surum.json` güncellenmelidir. Kararlar: `docs/kararlar/2026-11-13-dil-destegi-ve-guncelleme-denetimi.md`, `docs/kararlar/2026-11-21-guncelleme-denetimi-varsayilan-kapali.md`.
 
 ## Ayarlar ve kasa
 

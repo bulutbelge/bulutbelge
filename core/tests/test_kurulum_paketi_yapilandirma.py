@@ -1,5 +1,6 @@
 """Windows kurulum paketi türleri: varsayılan bootstrapper, ayrı çevrimdışı paket."""
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -69,3 +70,32 @@ def test_derleme_yml_gecerli_ve_cevrimdisi_adim_var():
     assert "--config src-tauri/tauri.offline.conf.json" in metin
     assert "-cevrimdisi" in metin
     assert "sha256sum" in metin
+
+
+def test_testler_yml_cekme_isteginde_guvenli_ve_sabit():
+    """Çekme isteği testleri: dış katkıcı kodu çalışır, bu yüzden salt okuma ve pull_request_target yok.
+    İş adı `Testler` dal kuralında zorunlu kontroldür (scripts/github_koruma.sh)."""
+    testler = DERLEME.with_name("testler.yml")
+    metin = testler.read_text(encoding="utf-8")
+    yml = yaml.safe_load(metin)
+    tetik = yml.get("on", yml.get(True))  # YAML 1.1: "on" anahtarı True okunabilir
+    assert set(tetik) == {"pull_request", "push"} and tetik["push"]["branches"] == ["main"]
+    assert "secrets." not in metin  # pull_request_target yukarıdaki tetikleyici kümesiyle dışlandı
+    assert yml["permissions"] == {"contents": "read"}
+    assert [i["name"] for i in yml["jobs"].values()] == ["Testler"]
+    assert "pytest" in metin and "tauri build" not in metin
+
+    # Her iş akışında eylemler 40 haneli commit SHA'sıyla sabit; testler.yml derleme.yml ile aynı SHA'yı kullanır.
+    # Yorum satırları (ör. SignPath yer tutucusu) sayılmaz.
+    kalip = re.compile(r"^\s*-?\s*uses:\s*([\w.-]+/[\w.-]+)@(\S+)", re.MULTILINE)
+    derleme = dict(kalip.findall(DERLEME.read_text(encoding="utf-8")))
+    for yol in DERLEME.parent.glob("*.yml"):
+        for eylem, ref in kalip.findall(yol.read_text(encoding="utf-8")):
+            assert re.fullmatch(r"[0-9a-f]{40}", ref), (yol.name, eylem)
+    assert kalip.findall(metin)
+    for eylem, ref in kalip.findall(metin):
+        assert derleme.get(eylem) == ref, eylem
+
+    koruma = KOK / "scripts" / "github_koruma.sh"  # yalnızca Bitbucket deposunda
+    if koruma.is_file():
+        assert '{"context": "Testler"}' in koruma.read_text(encoding="utf-8")

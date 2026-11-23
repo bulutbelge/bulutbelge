@@ -70,6 +70,7 @@ export default {
   "CSV olarak dışa aktar": "Export as CSV",
   "Zinciri denetle": "Verify chain",
   "{n} kayıt, zincir sağlam": "{n} records, chain intact",
+  "{n} kayıt, zincir sağlam ({legacy} eski kayıt mühürsüz)": "{n} records, chain intact ({legacy} older records without seal)",
   "{line}. satırda bozulma: {reason}": "Corruption at line {line}: {reason}",
   "Metni temizleyip kopyalayın": "Clean the text and copy it",
   "Yapay zekâya, e-postaya ya da mesaja yapıştırmadan önce. Metin hiçbir yere kaydedilmez ve gönderilmez.": "Before pasting it into an AI tool, an email or a message. The text is not saved or sent anywhere.",

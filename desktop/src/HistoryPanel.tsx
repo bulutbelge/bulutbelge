@@ -35,6 +35,8 @@ interface VerifyInfo {
   count: number;
   broken_at: number | null;
   reason: string;
+  sealed?: number; // anahtarlı mührü (HMAC) doğrulanan kayıt sayısı
+  legacy?: number; // mühür öncesi eski kayıt sayısı
 }
 
 const OPS: Record<string, string> = {
@@ -211,8 +213,13 @@ export function HistoryPanel({ typeLabels }: { typeLabels: Record<string, string
         {verify &&
           (verify.ok ? (
             <span className="pill conf-yuksek">
-              <Icon name="check" size={12} /> {t("{n} kayıt, zincir sağlam", { n: verify.count })}
+              <Icon name="check" size={12} />{" "}
+              {verify.legacy
+                ? t("{n} kayıt, zincir sağlam ({legacy} eski kayıt mühürsüz)", { n: verify.count, legacy: verify.legacy })
+                : t("{n} kayıt, zincir sağlam", { n: verify.count })}
             </span>
+          ) : verify.broken_at == null ? (
+            <span className="warn-text">{t(verify.reason)}</span>
           ) : (
             <span className="warn-text">
               {t("{line}. satırda bozulma: {reason}", { line: verify.broken_at ?? "", reason: t(verify.reason) })}

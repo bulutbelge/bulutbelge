@@ -9,23 +9,38 @@ Günlüğe yol, dosya özeti, tür bazında sayı, profil adı, çağıran ve so
 bulguların değeri, belge içeriği ve hata mesajı girmez (hata yalnızca koduyla).
 Yol ve amaç yazılmadan önce çekirdekle taranır: klasör ve dosya adlarındaki kişi adı ve
 diğer kişisel veriler etikete çevrilir (bağımsız inceleme bulgu 17; sunucudaki 2.18 ile aynı yaklaşım).
+
+Anahtarlı mühür (bulgu 22): her kayıt, günlükten ayrı bir dosyada duran rastgele 32 baytlık
+anahtarla HMAC-SHA256 ile mühürlenir (`gunluk-anahtari.json`, izinleri yalnızca kullanıcıya açık;
+`BULUTBELGE_JOURNAL_KEY_FILE` ile başka bir yere, ör. ayrı bir birime konabilir). Günlüğü
+değiştirip zinciri baştan hesaplayan ama anahtarı okuyamayan biri mührü tutturamaz. Anahtar ilk
+kullanımda üretilir; o ana kadarki eski kayıtlar mühürsüz kalır ve okunur, sonrakiler mühürsüz
+kabul edilmez. Anahtar dosyası kaybolmuşken günlükte mühürlü kayıt varsa yeni anahtar üretilmez:
+günlük yazılamaz sayılır (şüphede reddet). Karar: docs/kararlar/2026-11-23-denetim-zinciri-sabit-nokta.md.
 """
 
 from __future__ import annotations
 
+import base64
+import json
+import os
 import re
+import secrets
 from collections import Counter
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Callable
 
-from bulutbelge_core.audit import AuditError, AuditLog, file_sha256, filter_records, to_csv
+from bulutbelge_core.audit import AuditError, AuditLog, _last_line, _locked, file_sha256, filter_records, to_csv
 from bulutbelge_core.dosya_adi import mask_log_text
 
 from . import settings
 from .protocol import EngineError
 
 LOG_FILE = "islem-gunlugu.jsonl"
+KEY_FILE = "gunluk-anahtari.json"
+KEY_ENV = "BULUTBELGE_JOURNAL_KEY_FILE"
+_KEY_KIND = "bulutbelge-gunluk-muhur"
 
 # Kim çağırıyor: masaüstü arayüzü ("kullanici") ya da ajan komutu ("ajan", ad).
 CALLER: ContextVar[tuple[str, str | None]] = ContextVar("bulutbelge_caller", default=("kullanici", None))
@@ -59,8 +74,92 @@ class _MaskedLog(AuditLog):
         return super().append(op, **kw)
 
 
+def key_path() -> Path:
+    """Mühür anahtarının yolu: `BULUTBELGE_JOURNAL_KEY_FILE` ya da veri klasöründe günlükten ayrı dosya."""
+    raw = os.environ.get(KEY_ENV)
+    return Path(raw) if raw else settings.data_dir() / KEY_FILE
+
+
+def _read_key(path: Path) -> tuple[bytes, int]:
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8"))
+        key = base64.b64decode(obj["anahtar"], validate=True)
+        since = obj["zorunlu_sira"]
+    except (OSError, ValueError, KeyError, TypeError):
+        raise AuditError("Günlük mühür anahtarı okunamadı") from None
+    if obj.get("tur") != _KEY_KIND or len(key) != 32 or not isinstance(since, int) or since < 1:
+        raise AuditError("Günlük mühür anahtarı geçersiz")
+    return key, since
+
+
+def _restrict(path: Path) -> None:
+    """Dosyayı yalnızca sahibine açar (POSIX 0600). Windows'ta veri klasörü (%APPDATA%) zaten kullanıcıya özeldir."""
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
+def _tail_info(log_path: Path) -> tuple[int, bool]:
+    """Günlüğün son kaydının sırası ve mühürlü olup olmadığı (masaüstü günlüğü şifresizdir)."""
+    line = _last_line(log_path)
+    if line is None:
+        return 0, False
+    try:
+        rec = json.loads(line)
+        if rec.get("tur") == "kontrol_noktasi":
+            return int(rec["son_seq"]), "mac" in rec
+        return int(rec["seq"]), "mac" in rec
+    except (ValueError, KeyError, TypeError, AttributeError):
+        raise AuditError("Günlüğün son kaydı okunamadı") from None
+
+
+def journal_key(log_path: Path) -> tuple[bytes, int]:
+    """(anahtar, zorunlu_sira). Yoksa günlük kilidi altında üretilir; zorunlu sıra o anki son sıranın bir fazlası."""
+    path = key_path()
+    if path.is_file():
+        return _read_key(path)
+    try:
+        with _locked(log_path.with_name(log_path.name + ".kilit")):
+            if path.is_file():
+                return _read_key(path)
+            last_seq, sealed = _tail_info(log_path)
+            if sealed:
+                raise AuditError(
+                    "Günlük mühür anahtarı bulunamadı; mühürlü kayıtlar doğrulanamaz. "
+                    "Anahtarı geri koyun ya da eski günlüğü başka bir yere taşıyın"
+                )
+            key = secrets.token_bytes(32)
+            data = {
+                "v": 1,
+                "tur": _KEY_KIND,
+                "anahtar": base64.b64encode(key).decode("ascii"),
+                "zorunlu_sira": last_seq + 1,
+            }
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+                    f.flush()
+                    os.fsync(f.fileno())
+                _restrict(tmp)
+                os.replace(tmp, path)
+            finally:
+                tmp.unlink(missing_ok=True)
+            _restrict(path)
+            return key, last_seq + 1
+    except AuditError:
+        raise
+    except OSError as exc:
+        raise AuditError(f"Günlük mühür anahtarı yazılamadı ({type(exc).__name__})") from None
+
+
 def log() -> AuditLog:
-    return _MaskedLog(settings.data_dir() / LOG_FILE)
+    path = settings.data_dir() / LOG_FILE
+    key, since = journal_key(path)
+    return _MaskedLog(path, mac_key=key, mac_from_seq=since)
 
 
 def _preflight() -> AuditLog:
@@ -230,8 +329,21 @@ def log_list(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def log_verify(_params: dict[str, Any]) -> dict[str, Any]:
-    v = log().verify()
-    return {"ok": v.ok, "count": v.count, "broken_at": v.broken_at, "reason": v.reason, "last_hash": v.last_hash}
+    """Zinciri ve anahtarlı mührü denetler. `sealed`: mührü doğrulanan kayıt, `legacy`: mühürsüz eski kayıt sayısı."""
+    try:
+        v = log().verify()
+    except AuditError as exc:
+        return {"ok": False, "count": 0, "broken_at": None, "reason": str(exc), "last_hash": None, "sealed": 0, "legacy": 0}
+    return {
+        "ok": v.ok,
+        "count": v.count,
+        "broken_at": v.broken_at,
+        "reason": v.reason,
+        "last_hash": v.last_hash,
+        "last_seq": v.last_seq,
+        "sealed": v.mac_checked,
+        "legacy": v.legacy,
+    }
 
 
 def log_export(params: dict[str, Any]) -> dict[str, Any]:

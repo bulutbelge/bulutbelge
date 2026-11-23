@@ -12,12 +12,21 @@ Birden çok süreç (masaüstü motoru ve ajan komutu) aynı günlüğe yazabili
 ekleme bir kilit dosyasıyla sıraya konur.
 
 Sınır: dosyanın sonundan kayıt kesilirse zincir yine tutarlıdır. Bunu yakalamak
-için son özetin dışarıda (ör. düzenli dışa aktarılan CSV) saklanması gerekir.
+için son özetin dışarıda saklanması gerekir: sunucuda imzalı sabit nokta
+(`bulutbelge_server.sabit_nokta`), masaüstünde düzenli dışa aktarılan CSV.
 
 Saklama (TAKIP G.2, yalnızca sunucu çağırır): `prune` süresi dolan baştaki kayıtları
 bir bütün hâlinde siler ve günlüğün ilk satırına bir kontrol noktası yazar (son silinen
 kaydın özeti ve sırası). Kalan kayıtlar değişmez; `verify` zinciri kontrol noktasından
 sürdürür. Karar: docs/kararlar/2026-11-21-g2-gunluk-saklama-kontrol-noktasi.md.
+
+Anahtarlı mühür (bağımsız inceleme bulgu 22): `mac_key` verilirse her yeni kayda `v=3` ve
+`mac` alanı yazılır: kaydın (özet dahil) HMAC-SHA256'sı. Düz SHA-256 zincirini dosyaya
+yazabilen biri baştan hesaplayabilir; anahtarı bilmeyen `mac`'i hesaplayamaz. Eski
+(`mac`'siz) kayıtlar okunur ve doğrulanır; ancak ilk mühürlü kayıttan sonra ya da
+`mac_from_seq` sırasından itibaren mühürsüz kayıt kabul edilmez (eski biçime düşürme
+saldırısı). İlk mühürlü kayıt `prev` ile önceki zinciri de bağlar.
+Karar: docs/kararlar/2026-11-23-denetim-zinciri-sabit-nokta.md.
 """
 
 from __future__ import annotations
@@ -26,6 +35,7 @@ import base64
 import binascii
 import csv
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -42,6 +52,9 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 GENESIS = "0" * 64
 VERSION = 1
 ENCRYPTED_VERSION = 2
+# Anahtarlı mühürlü (HMAC) olay kaydı sürümü; zarf sürümü (2) ile karışmaz, şifreli zarfın içinde de olabilir.
+MAC_VERSION = 3
+_MAC_CONTEXT = b"bulutbelge-audit-mac-v3:"
 _AUDIT_AAD = b"bulutbelge-audit-v2"
 
 # Kayıttaki alanlar ve sırası (CSV sütunları da bu sırayla).
@@ -98,6 +111,9 @@ class VerifyResult:
     reason: str = ""
     last_hash: str = GENESIS
     checkpoint: dict[str, Any] | None = None  # günlük budanmışsa geçerli kontrol noktası
+    last_seq: int = 0  # son olay kaydının sıra numarası (budanmışsa kontrol noktasından sürer)
+    mac_checked: int = 0  # anahtarlı mührü (HMAC) doğrulanan olay kaydı sayısı
+    legacy: int = 0  # mühürsüz eski kayıt sayısı (yalnızca anahtarla doğrulamada sayılır)
 
 
 @dataclass
@@ -114,7 +130,7 @@ def is_checkpoint(record: Any) -> bool:
 
 def _checkpoint_error(rec: dict[str, Any]) -> str | None:
     """Kontrol noktası biçim ve özet denetimi; sorun yoksa None."""
-    if set(rec) != _CHECKPOINT_KEYS:
+    if set(rec) - {"mac"} != _CHECKPOINT_KEYS:
         return "Kontrol noktası biçimi geçersiz"
     son_seq, ozet, silinen = rec.get("son_seq"), rec.get("son_silinen_ozet"), rec.get("silinen")
     if not (isinstance(son_seq, int) and not isinstance(son_seq, bool) and son_seq >= 1):
@@ -151,9 +167,22 @@ def file_sha256(path: str | os.PathLike) -> str | None:
 
 
 def record_hash(record: dict[str, Any]) -> str:
-    body = {k: v for k, v in record.items() if k != "hash"}
+    """Kaydın SHA-256 özeti (`hash` ve `mac` hariç); `mac`'siz eski kayıtlarda değer aynıdır."""
+    body = {k: v for k, v in record.items() if k not in ("hash", "mac")}
     data = json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+
+def record_mac(record: dict[str, Any], mac_key: bytes) -> str:
+    """Kaydın anahtarlı mührü: `mac` dışındaki bütün alanların (özet dahil) HMAC-SHA256'sı."""
+    body = {k: v for k, v in record.items() if k != "mac"}
+    data = json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hmac.new(mac_key, _MAC_CONTEXT + data.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _mac_ok(record: dict[str, Any], mac_key: bytes) -> bool:
+    mac = record.get("mac")
+    return isinstance(mac, str) and hmac.compare_digest(mac, record_mac(record, mac_key))
 
 
 def _clean_counts(counts: Any) -> dict[str, int]:
@@ -252,6 +281,14 @@ def _validate_cipher_key(cipher_key: bytes | None) -> bytes | None:
     return bytes(cipher_key)
 
 
+def _validate_mac_key(mac_key: bytes | None) -> bytes | None:
+    if mac_key is None:
+        return None
+    if not isinstance(mac_key, (bytes, bytearray)) or len(mac_key) < 32:
+        raise ValueError("Günlük mühür anahtarı en az 32 bayt olmalı")
+    return bytes(mac_key)
+
+
 def _seal_record(record: dict[str, Any], cipher_key: bytes | None) -> str:
     plain = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
     if cipher_key is None:
@@ -287,10 +324,21 @@ def _open_record(raw: bytes | str, cipher_key: bytes | None) -> dict[str, Any]:
 
 
 class AuditLog:
-    def __init__(self, path: str | os.PathLike, cipher_key: bytes | None = None) -> None:
+    def __init__(
+        self,
+        path: str | os.PathLike,
+        cipher_key: bytes | None = None,
+        *,
+        mac_key: bytes | None = None,
+        mac_from_seq: int | None = None,
+    ) -> None:
+        """`mac_key`: anahtarlı mühür (HMAC) anahtarı; verilirse yeni kayıtlar mühürlenir ve `verify` mührü
+        denetler. `mac_from_seq`: bu sıradan itibaren mühürsüz kayıt kabul edilmez (anahtarın üretildiği an)."""
         self.path = Path(path)
         self.lock_path = self.path.with_name(self.path.name + ".kilit")
         self._cipher_key = _validate_cipher_key(cipher_key)
+        self._mac_key = _validate_mac_key(mac_key)
+        self._mac_from_seq = mac_from_seq
 
     def _tail(self) -> tuple[int, str]:
         line = _last_line(self.path)
@@ -356,7 +404,7 @@ class AuditLog:
             with _locked(self.lock_path):
                 seq, prev = self._tail()
                 record: dict[str, Any] = {
-                    "v": VERSION,
+                    "v": MAC_VERSION if self._mac_key else VERSION,
                     "seq": seq + 1,
                     "at": at or datetime.now().astimezone().isoformat(timespec="seconds"),
                     "op": op,
@@ -390,6 +438,8 @@ class AuditLog:
                 if paket:
                     record["paket"] = _opt_str(paket, 80)
                 record["hash"] = record_hash(record)
+                if self._mac_key:
+                    record["mac"] = record_mac(record, self._mac_key)
                 line = _seal_record(record, self._cipher_key)
                 with self.path.open("ab") as f:
                     f.write(line.encode("utf-8"))
@@ -483,10 +533,23 @@ class AuditLog:
         with self.path.open("rb") as f:
             return self._verify_lines(enumerate(f, 1))
 
+    def _mac_error(self, rec: dict[str, Any], seq: int, mac_seen: bool) -> str | None:
+        """Anahtarlı mühür denetimi (anahtar yoksa yapılmaz); sorun yoksa None."""
+        if self._mac_key is None:
+            return None
+        if "mac" in rec:
+            if not _mac_ok(rec, self._mac_key):
+                return "Kayıt mührü (HMAC) tutmuyor: kayıt değiştirilmiş ya da zincir anahtarsız yeniden hesaplanmış"
+            return None
+        if mac_seen or (self._mac_from_seq is not None and seq >= self._mac_from_seq):
+            return "Mühürsüz kayıt: anahtarlı mühür zorunluyken HMAC'siz kayıt eklenmiş"
+        return None
+
     def _verify_lines(self, lines: Any) -> VerifyResult:
         prev, seq, count = GENESIS, 0, 0
         checkpoint: dict[str, Any] | None = None
         first = True
+        mac_seen, mac_checked, legacy = False, 0, 0
         for n, raw in lines:
             if not raw.strip():
                 continue
@@ -500,9 +563,10 @@ class AuditLog:
                 if not first:
                     return VerifyResult(False, count + 1, n, "Kontrol noktası yalnızca günlüğün ilk kaydı olabilir")
                 first = False
-                err = _checkpoint_error(rec)
+                err = _checkpoint_error(rec) or self._mac_error(rec, int(rec["son_seq"]), mac_seen)
                 if err:
                     return VerifyResult(False, count + 1, n, err)
+                mac_seen = mac_seen or "mac" in rec
                 checkpoint = rec
                 prev, seq = rec["son_silinen_ozet"], rec["son_seq"]
                 continue
@@ -515,8 +579,18 @@ class AuditLog:
                 return VerifyResult(False, count, n, "Sıra numarası beklenmeyen")
             if record_hash(rec) != rec.get("hash"):
                 return VerifyResult(False, count, n, "Kayıt sonradan değiştirilmiş")
+            err = self._mac_error(rec, seq, mac_seen)
+            if err:
+                return VerifyResult(False, count, n, err)
+            if self._mac_key is not None:
+                if "mac" in rec:
+                    mac_seen, mac_checked = True, mac_checked + 1
+                else:
+                    legacy += 1
             prev = rec["hash"]
-        return VerifyResult(True, count, last_hash=prev, checkpoint=checkpoint)
+        return VerifyResult(
+            True, count, last_hash=prev, checkpoint=checkpoint, last_seq=seq, mac_checked=mac_checked, legacy=legacy
+        )
 
     def prune(
         self,
@@ -578,6 +652,8 @@ class AuditLog:
                     "saklama_gun": days,
                 }
                 cp["hash"] = record_hash(cp)
+                if self._mac_key:
+                    cp["mac"] = record_mac(cp, self._mac_key)
                 remaining = body[cut:]
                 try:
                     with tmp.open("wb") as f:
