@@ -57,13 +57,19 @@
       "nsis": {
         "installerHooks": "windows/hooks.nsh",
         "languages": ["Turkish", "English"],
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "customLanguageFiles": {
+          "Turkish": "windows/nsis/Turkish.nsh",
+          "English": "windows/nsis/English.nsh"
+        }
       },
       "wix": {
         "language": {
           "tr-TR": { "localePath": "windows/wix/tr-TR.wxl" },
           "en-US": {}
-        }
+        },
+        "fragmentPaths": ["windows/wix/kayit-temizle.wxs"],
+        "componentRefs": ["KayitAnahtariTemizle"]
       }
     }
   }

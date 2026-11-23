@@ -37,7 +37,7 @@ Kurulum programı Python, Rust ya da Node gerektirmez; her şey paketin içinded
 
 > **Not:** Windows kurulum dosyaları henüz kod imzalı değildir; SmartScreen "bilinmeyen yayıncı" uyarısı çıkabilir (imza yayımlanınca bu not kalkacak). İlk sürümün indirme sayfası yayımlanana kadar kurulum dosyasını kurumunuzun BT ekibinden alın.
 
-**Komut satırı (ajanlar ve otomasyon için):** `.exe` kurulum programı `bulutbelge` komutunu da tanımlar. Yeni bir PowerShell açıp `bulutbelge --help` ya da `bulutbelge kilavuz` yazın. Komutlar: `folders` (izinler), `scan` (değer göstermeden bulgu sayıları), `read` (maskeli metin), `mask` (maskeli kopya), `mcp` (ajan araçları için yerel MCP sunucusu; yalnızca stdio, ağ portu açmaz; Claude Code'da `claude mcp add bulutbelge -- bulutbelge mcp`). `.msi` PATH'e dokunmaz; komutu `C:\Program Files\BulutBelge\engine\bulutbelge-engine.exe` ile çalıştırın. Ayrıntı: `docs/AJAN-KOMUT-SATIRI.md`.
+**Komut satırı (ajanlar ve otomasyon için):** `.exe` kurulum programı `bulutbelge` komutunu da tanımlar. Yeni bir PowerShell açıp `bulutbelge --help` ya da `bulutbelge kilavuz` yazın. Komutlar: `folders` (izinler), `scan` (değer göstermeden bulgu sayıları), `read` (maskeli metin), `mask` (maskeli kopya), `mcp` (ajan araçları için yerel MCP sunucusu; yalnızca stdio, ağ portu açmaz; Claude Code'da `claude mcp add bulutbelge -- bulutbelge mcp`). `.msi` PATH'e dokunmaz; komutu kurulum klasöründeki `engine\bulutbelge-engine.exe` ile çalıştırın (varsayılan `C:\Program Files\BulutBelge`; kurulum klasörünü PowerShell'de `(Get-ItemProperty 'HKCU:\Software\proteksistem\BulutBelge').InstallDir` gösterir). Ayrıntı: `docs/AJAN-KOMUT-SATIRI.md`.
 
 **Kaldırma:** Ayarlar › Uygulamalar'dan kaldırın. Belgeleriniz ve ayarlarınız silinmez; ayarlar kullanıcı klasörünüzde kalır.
 
@@ -302,5 +302,7 @@ Windows'ta uygulama iki paketle dağıtılır; kaldırma davranışı farklıdı
 - **MSI:** Veri silme seçeneği yoktur; program silinir, **uygulama verisi kalır**. Silmek isterseniz kaldırdıktan sonra şu klasörleri elle silin:
   - `%APPDATA%\com.proteksistem.bulutbelge` (ayarlar ve işlem günlüğü)
   - `%LOCALAPPDATA%\com.proteksistem.bulutbelge` (WebView2 önbelleği)
+
+**`.exe`'den `.msi`'ye geçerken:** önce `.exe` ile kurulan sürümü kaldırın, sonra `.msi`'yi kurun. Her iki kaldırıcı da kurulum yerini tutan `HKCU\Software\proteksistem\BulutBelge` kayıt anahtarını siler. Eski bir sürümü kaldırdığınız hâlde `.msi` yine `%LOCALAPPDATA%\BulutBelge` altına kuruluyorsa bu anahtar önceki sürümden kalmıştır: `.msi`'yi kaldırın, PowerShell'de `Remove-Item 'HKCU:\Software\proteksistem\BulutBelge' -Recurse` ile anahtarı silin ve yeniden kurun; uygulama `C:\Program Files\BulutBelge` altına kurulur.
 
 **Not:** İşlem günlüğü bir denetim kaydıdır (hash zincirli). Silmeden önce kurumunuzun saklama kurallarına bakın; gerekiyorsa `CSV olarak dışa aktar` ile bir kopya alın. Günlüğü sildikten sonra geçmiş işlemler denetlenemez.

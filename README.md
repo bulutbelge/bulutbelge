@@ -67,7 +67,7 @@ Müşteriye, denetçiye, kurum içine ya da bir yapay zekâ aracına giden aynı
 <td valign="top">
 
 ### 📴 Çevrimdışı masaüstü
-Belge bilgisayarınızdan çıkmaz. Hesap ve internet istemez. **Hiçbir sunucuya bağlanmaz.**
+Belge bilgisayarınızdan çıkmaz. Hesap ve internet istemez. **Belgeyi ve içindeki bilgileri hiçbir yere göndermez.**
 
 </td>
 <td valign="top">
@@ -221,7 +221,7 @@ Her adım, biçimin kendi iç yapısında çalışır: PDF içerik akışı ve f
 
 ## Masaüstü ve kurumsal sunucu
 
-Bu depo **masaüstü uygulamasını** ve ortak **çekirdeği** içerir. Masaüstü uygulaması belgelerinizi dışarı göndermez ve **hiçbir sunucuya bağlanmaz**. Kurumların kendi altyapısında çalıştırdığı, API anahtarıyla kullanılan **kurumsal sunucu** ürünü ayrıdır ve bu depoda değildir; bilgi için [bulutbelge.com](https://bulutbelge.com).
+Bu depo **masaüstü uygulamasını** ve ortak **çekirdeği** içerir. Masaüstü uygulaması belgelerinizi ve içlerindeki bilgileri dışarı göndermez; **kurumsal sunucu ürününe bağlanmaz**. Kurumların kendi altyapısında çalıştırdığı, API anahtarıyla kullanılan **kurumsal sunucu** ürünü ayrıdır ve bu depoda değildir; bilgi için [bulutbelge.com](https://bulutbelge.com).
 
 ## Güvenlik ilkeleri
 
@@ -265,7 +265,7 @@ GNU Affero Genel Kamu Lisansı sürüm 3 ([AGPL-3.0](LICENSE)). Üçüncü taraf
 
 **BulutBelge removes personal data from documents for real, before you share them.** A black box over text in a PDF does not delete it; anyone can still copy, search or extract it. BulutBelge finds the data, masks it according to who will receive the document, physically removes it from the file (text layer, pixels, metadata) and re-reads the saved copy to check that nothing leaked. If a value that should be masked can still be read, the file is not written.
 
-- **Desktop app** (Tauri): works fully offline, never connects to any server, never touches the original file. Windows installer first; macOS and Linux packages are being prepared.
+- **Desktop app** (Tauri): works fully offline, never sends documents or personal data anywhere, never touches the original file. Windows installer first; macOS and Linux packages are being prepared.
 - A separate **enterprise server** product (API + admin panel, used only through API keys) exists but is not part of this repository.
 - **34 data types**, 7 masking methods, 9 built-in rule sets, local OCR and face detection, folder and ZIP batch processing.
 - **Formats:** PDF, DOCX, XLSX, PPTX, images, e-invoice XML, UDF, EML, plain-text and data files (`.txt .csv .tsv .log .md .json .ini .yaml .yml`), ZIP.

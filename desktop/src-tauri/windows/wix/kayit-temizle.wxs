@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  W.2: MSI kaldırılınca HKCU\Software\proteksistem\BulutBelge anahtarı bütünüyle silinir.
+
+  Neden: Tauri'nin main.wxs şablonu kurulum klasörünü (INSTALLDIR) bu anahtardan okur (PrevInstallDir*
+  aramaları). Kaldırırken yalnızca kendi yazdığı değerleri siler; önceki bir NSIS kurulumunun bıraktığı
+  değerler ("Installer Language", varsayılan değer) anahtarı ayakta tutar ve sonraki MSI kurulumu
+  Program Files yerine %LOCALAPPDATA%'ya gider (docs/test/2026-11-21-windows-deneme-5.md).
+  NSIS kaldırıcısı aynı anahtarı windows/hooks.nsh içinde siler.
+
+  Bileşen tauri.conf.json'da bundle.windows.wix.componentRefs ile pakete eklenir.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="KayitAnahtariTemizle" Guid="*">
+        <RegistryValue Root="HKCU" Key="Software\proteksistem\BulutBelge" Name="KaldirincaTemizle" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveRegistryKey Id="KayitAnahtariKaldir" Root="HKCU" Key="Software\proteksistem\BulutBelge" Action="removeOnUninstall" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

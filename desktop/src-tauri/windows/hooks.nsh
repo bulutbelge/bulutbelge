@@ -1,3 +1,9 @@
+; W.5: karşılama ve lisans sayfası metinleri. Bu dosya Tauri şablonunda sayfa tanımlarından önce
+; include edilir; metinler windows/nsis/{Turkish,English}.nsh içindeki LangString'lerdir. Lisans
+; sayfasının alt metni NSIS'in düğme yazısıyla aynıdır (Turkish.nlf ^AgreeBtn "Katılıyorum", English "I Agree").
+!define MUI_WELCOMEPAGE_TEXT "$(bbKarsilama)"
+!define MUI_LICENSEPAGE_TEXT_BOTTOM "$(bbLisansAlt)"
+
 ; BulutBelge komut satırı: NSIS kurulumu, kurulum klasörünü KULLANICI PATH'ine ekler ve
 ; `bulutbelge` kısa adını yazar; böylece yeni açılan terminalde `bulutbelge read <dosya>` çalışır.
 ; Kaldırınca ikisi de geri alınır. Yalnızca geçerli kullanıcının ortamı değişir (yönetici izni gerekmez).

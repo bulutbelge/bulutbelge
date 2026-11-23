@@ -48,7 +48,7 @@ Ayarlar'daki **Ajan yönergesini kopyala** düğmesi aşağıdaki hazır yönerg
 | Kurulum | Komut |
 |---|---|
 | Windows, NSIS kurulumu (önerilen) | `bulutbelge <komut>`: kurulum, klasörü kullanıcının PATH'ine ekler ve `bulutbelge` kısa adını yazar (**yeni açılan** terminalde geçerli). Dosya: `%LOCALAPPDATA%\BulutBelge\engine\bulutbelge-engine.exe` |
-| Windows, MSI | MSI PATH'e dokunmaz: `"C:\Program Files\BulutBelge\engine\bulutbelge-engine.exe" <komut>` (varsayılan kurulum klasörü) |
+| Windows, MSI | MSI PATH'e dokunmaz: `"<kurulum klasörü>\engine\bulutbelge-engine.exe" <komut>`. Varsayılan kurulum klasörü `C:\Program Files\BulutBelge`; Kurulum klasörünü PowerShell'de `(Get-ItemProperty 'HKCU:\Software\proteksistem\BulutBelge').InstallDir` gösterir |
 | macOS | `/Applications/BulutBelge.app/Contents/Resources/engine/bulutbelge-engine <komut> ...` (macOS'ta denenmedi) |
 | Linux (.deb) | `bulutbelge <komut> ...` (paket `/usr/bin/bulutbelge` kısa adını ve `man bulutbelge` sayfasını kurar; tam yol `/usr/lib/BulutBelge/engine/bulutbelge-engine`. Linux'ta denenmedi; AppImage'da komut satırı yoktur, .deb kullanın) |
 | Geliştirme ortamı | `desktop/engine/.venv/bin/python -m bulutbelge_engine.cli <komut>` (Windows: `.venv\Scripts\python.exe`) |
@@ -157,7 +157,7 @@ Ajan adı (işlem günlüğüne girer): yapılandırmadaki `BULUTBELGE_AJAN` ort
 claude mcp add bulutbelge -- bulutbelge mcp
 ```
 
-Komut PATH'te değilse tam yolu yazın, ör. `claude mcp add bulutbelge -- "C:\Program Files\BulutBelge\engine\bulutbelge-engine.exe" mcp` (bu kurulumdaki yol: `bulutbelge kilavuz --yonerge` çıktısındaki komut).
+Komut PATH'te değilse tam yolu yazın, ör. varsayılan MSI kurulumunda `claude mcp add bulutbelge -- "C:\Program Files\BulutBelge\engine\bulutbelge-engine.exe" mcp` (bu kurulumdaki yol: `bulutbelge kilavuz --yonerge` çıktısındaki komut).
 
 **Cursor** (`~/.cursor/mcp.json` ya da projede `.cursor/mcp.json`):
 
