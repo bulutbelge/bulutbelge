@@ -17,6 +17,9 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+# Bir bölüm hata verirse kaydedilir, sonraki bölümler yine çalışır.
+trap { Yaz "HATA: $($_.Exception.Message) (satır $($_.InvocationInfo.ScriptLineNumber))"; $script:Hatalar++; continue }
+$script:Hatalar = 0
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $AppId = 'com.proteksistem.bulutbelge'
 $KurulumYeri = Join-Path $env:LOCALAPPDATA 'BulutBelge'
@@ -124,7 +127,10 @@ $MsiTr = Get-ChildItem $Paket -Filter '*tr-TR.msi' | Where-Object { $_.Name -not
 # --- B. WebView2 şifreli DNS --------------------------------------------------------------------------------
 Yaz ""
 Yaz "## B. WebView2 şifreli DNS (W.1)"
-$ad = Get-NetAdapter | Where-Object Status -eq 'Up' | Sort-Object ifIndex | Select-Object -First 1
+# İnternet trafiğinin geçtiği bağdaştırıcı (varsayılan yol); sanal bağdaştırıcıların DNS istemcisi olmayabilir.
+$yol = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric, InterfaceMetric | Select-Object -First 1
+$ad = Get-NetAdapter -InterfaceIndex $yol.InterfaceIndex -ErrorAction SilentlyContinue
+Yaz "Bağdaştırıcı: $($ad.InterfaceDescription) (ifIndex $($ad.ifIndex))"
 $eskiDns = (Get-DnsClientServerAddress -InterfaceIndex $ad.ifIndex -AddressFamily IPv4).ServerAddresses -join ', '
 Set-DnsClientServerAddress -InterfaceIndex $ad.ifIndex -ServerAddresses '1.1.1.1', '8.8.8.8'
 Clear-DnsClientCache
@@ -242,7 +248,7 @@ if (-not $wg) {
     $v = winget validate --manifest $man 2>&1 | Out-String
     Sonuc 'winget' 'Manifest doğrulaması' ($LASTEXITCODE -eq 0 -or $v -match 'succeeded|başarılı') ($v.Trim() -replace '\s+', ' ')
     winget settings --enable LocalManifestFiles *> $null
-    $wi = Start-Process winget -ArgumentList 'install', '--manifest', "`"$man`"", '--silent', '--accept-package-agreements',
+    $wi = Start-Process $wg.Source -ArgumentList 'install', '--manifest', "`"$man`"", '--silent', '--accept-package-agreements',
         '--accept-source-agreements', '--disable-interactivity' -PassThru -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'winget.txt')
     $bitti = $wi.WaitForExit(600000)
     if (-not $bitti) { Stop-Process -Id $wi.Id -Force -ErrorAction SilentlyContinue }
@@ -262,7 +268,7 @@ Yaz ""
 Yaz "| Bölüm | Kontrol | Sonuç | Ayrıntı |"
 Yaz "|---|---|---|---|"
 foreach ($s in $Sonuclar) { Yaz ("| {0} | {1} | {2} | {3} |" -f $s.Bolum, $s.Kontrol, $(if ($s.Gecti) { 'geçti' } else { '**kaldı**' }), ($s.Ayrinti -replace '\|', '/')) }
-$kalan = @($Sonuclar | Where-Object { -not $_.Gecti }).Count
+$kalan = @($Sonuclar | Where-Object { -not $_.Gecti }).Count + $script:Hatalar
 Yaz ""
-Yaz "Toplam $($Sonuclar.Count) kontrol, kalan $kalan."
+Yaz "Toplam $($Sonuclar.Count) kontrol, kalan $kalan (betik hatası $($script:Hatalar))."
 exit $(if ($kalan) { 1 } else { 0 })
