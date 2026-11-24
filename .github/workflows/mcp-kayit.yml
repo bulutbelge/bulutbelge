@@ -1,0 +1,90 @@
+# Resmî MCP kaydına (registry.modelcontextprotocol.io) yayın: io.github.bulutbelge/bulutbelge.
+# Karar: docs/kararlar/2026-11-24-mcp-kaydi-mcpb.md (iç belge). Yalnızca v* etiketli bir sürümün Release'i
+# YAYIMLANINCA çalışır: derleme.yml taslak Release açar, taslaktaki dosyalar herkese açık değildir ve kayıt
+# MCPB adresine istek atarak dosyanın erişilebilir olduğunu denetler. Taslağı yayımlamak insan onayıyla yapılır;
+# bu iş akışı o onaydan sonra kendiliğinden çalışır. Başarısız olursa GitHub'da "Re-run" ile yinelenir.
+#
+# Kimlik: GitHub Actions OIDC (gizli değer yok). Kuruluş ad alanına (io.github.bulutbelge) etkileşimli girişle
+# yayın şu an çalışmıyor (modelcontextprotocol/registry#1468); OIDC belirteci depo sahibini taşıdığı için çalışır.
+# Eylemler commit SHA'sı ile sabitlenir; mcp-publisher sabit sürümdür ve Sigstore imzası doğrulanır.
+name: MCP kaydı
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-kayit
+  cancel-in-progress: false
+
+jobs:
+  kayit:
+    name: server.json ve kayda yayın
+    # Yalnızca bu depoda, v* etiketli, ön sürüm olmayan Release'te.
+    if: >-
+      github.repository == 'bulutbelge/bulutbelge' &&
+      startsWith(github.event.release.tag_name, 'v') &&
+      !github.event.release.prerelease && !github.event.release.draft
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      # MCP kaydına OIDC ile giriş için kısa ömürlü kimlik.
+      id-token: write
+    env:
+      ETIKET: ${{ github.event.release.tag_name }}
+      # Güncellerken sürümü bilerek değiştirin; "latest" kullanılmaz.
+      MCP_PUBLISHER_VERSION: v1.8.9
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Release'teki MCPB paketleri ve SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$ETIKET" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/mcpb" \
+            --pattern 'bulutbelge-mcp-*.mcpb' --pattern SHA256SUMS
+          ls -l "$RUNNER_TEMP/mcpb"
+      # Dosyaların bu depodaki derleme.yml ile, bu etiketten üretildiğini doğrular (Sigstore derleme kanıtı).
+      - name: Derleme kanıtını doğrula
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in "$RUNNER_TEMP"/mcpb/bulutbelge-mcp-*.mcpb; do
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/derleme.yml" --source-ref "refs/tags/$ETIKET"
+          done
+      # Sürüm ve paketler (her platform için indirme adresi ve dosyadan hesaplanan SHA-256) yazılır; özet
+      # SHA256SUMS ile karşılaştırılır, kayıt kurallarına (GitHub Release adresi, "mcp", fileSha256) uyulduğu denetlenir.
+      - name: server.json
+        run: |
+          python desktop/scripts/mcp_server_json.py --surum "${ETIKET#v}" --depo "$GITHUB_REPOSITORY" \
+            --dosyalar "$RUNNER_TEMP/mcpb" --sha256sums "$RUNNER_TEMP/mcpb/SHA256SUMS"
+          cat server.json
+      - name: cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: mcp-publisher (sabit sürüm, imza doğrulamalı)
+        run: |
+          set -euo pipefail
+          arsiv="mcp-publisher_linux_amd64.tar.gz"
+          adres="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl --fail --location --silent --show-error --output "$arsiv" "$adres/$arsiv"
+          curl --fail --location --silent --show-error --output "$arsiv.sigstore.json" "$adres/$arsiv.sigstore.json"
+          cosign verify-blob --bundle "$arsiv.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" "$arsiv"
+          tar xzf "$arsiv" mcp-publisher
+          rm -f "$arsiv" "$arsiv.sigstore.json"
+      - name: Doğrula (yayından önce)
+        run: ./mcp-publisher validate server.json
+      - name: Kayda giriş (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+      - name: Kayda yayımla
+        run: ./mcp-publisher publish server.json

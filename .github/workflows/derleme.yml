@@ -1,5 +1,6 @@
 # Açık depo sürüm derlemesi. Bitbucket'taki bitbucket-pipelines.yml derleme adımları (1.87) örnek alındı.
 # v* etiketinde ve elle çalışır: önce testler, sonra Windows (MSI, NSIS), macOS (dmg), Linux (deb, AppImage),
+# her platform için yerel MCP sunucusunun MCPB paketi (.mcpb, resmî MCP kaydı ve Smithery için; mcp-kayit.yml),
 # en sonda SHA256SUMS ve taslak Release. İmzasız derlemedir; imza adımı için aşağıdaki SignPath yer tutucusuna bakın.
 # Eylemler commit SHA'sı ile sabitlenir; sürüm yorumu yanındadır. Güncellerken SHA'yı etiketten yeniden çözün.
 name: Derleme
@@ -65,9 +66,9 @@ jobs:
           # Etikette her zaman; elle çalıştırmada yalnızca macos kutusu işaretliyse.
           MACOS: ${{ github.event_name != 'workflow_dispatch' || inputs.macos }}
         run: |
-          win='{"ad":"windows","calistirici":"windows-latest","hedef":"x86_64-pc-windows-msvc","ek_kilit":"requirements-windows.lock","paketler":"msi nsis"}'
-          mac='{"ad":"macos","calistirici":"macos-latest","hedef":"aarch64-apple-darwin","ek_kilit":"requirements-macos.lock","paketler":"dmg"}'
-          lin='{"ad":"linux","calistirici":"ubuntu-22.04","hedef":"x86_64-unknown-linux-gnu","ek_kilit":"","paketler":"deb appimage"}'
+          win='{"ad":"windows","calistirici":"windows-latest","hedef":"x86_64-pc-windows-msvc","ek_kilit":"requirements-windows.lock","paketler":"msi nsis","mcpb":"windows-x64"}'
+          mac='{"ad":"macos","calistirici":"macos-latest","hedef":"aarch64-apple-darwin","ek_kilit":"requirements-macos.lock","paketler":"dmg","mcpb":"macos-arm64"}'
+          lin='{"ad":"linux","calistirici":"ubuntu-22.04","hedef":"x86_64-unknown-linux-gnu","ek_kilit":"","paketler":"deb appimage","mcpb":"linux-x64"}'
           if [ "$MACOS" = "true" ]; then liste="[$win,$mac,$lin]"; else liste="[$win,$lin]"; fi
           echo "include=$liste" >> "$GITHUB_OUTPUT"
 
@@ -220,6 +221,18 @@ jobs:
           for p in ${{ matrix.paketler }}; do
             find "$bundle/$p" -maxdepth 1 -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) -exec cp {} cikti/ \;
           done
+      # Yerel MCP sunucusunun MCPB paketi (karar: 2026-11-24-mcp-kaydi-mcpb). İçerik motor klasörünün birebir
+      # kopyasıdır: macOS'ta yukarıda Developer ID ile imzalanan ve uygulamayla birlikte notarize edilen dosyalar.
+      # Betik motoru `mcp` olarak çalıştırıp araç listesini alır, paketi açıp yeniden dener; etikette sürüm
+      # etiketle aynı olmalıdır. Manifest, MCPB'nin resmî doğrulayıcısıyla (sabit sürüm) ayrıca denetlenir.
+      - name: MCPB paketi (yerel MCP sunucusu)
+        run: |
+          surum=""; if [ "$GITHUB_REF_TYPE" = "tag" ]; then surum="--surum ${GITHUB_REF_NAME#v}"; fi
+          mkdir -p "$RUNNER_TEMP/mcpb"
+          python desktop/scripts/mcpb_paketle.py --motor desktop/src-tauri/binaries/engine \
+            --platform ${{ matrix.mcpb }} --cikti cikti $surum --manifest-yaz "$RUNNER_TEMP/mcpb/manifest.json"
+          cp desktop/src-tauri/icons/icon.png "$RUNNER_TEMP/mcpb/icon.png"
+          npx --yes @anthropic-ai/mcpb@2.1.2 validate "$RUNNER_TEMP/mcpb/manifest.json"
       # Çevrimdışı Windows paketi: WebView2 kurulum paketin içindedir (internetsiz kurumlar için).
       # Normal paketler yukarıda cikti/ içine kopyalandı; burada aynı paketler yeniden derlenir ve "-cevrimdisi" ekiyle adlandırılır.
       - name: Uygulamayı derle, çevrimdışı (Tauri, Windows)
@@ -273,7 +286,9 @@ jobs:
       - name: Derleme kanıtı (Sigstore)
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: "cikti/BulutBelge_*"
+          subject-path: |
+            cikti/BulutBelge_*
+            cikti/bulutbelge-mcp-*.mcpb
       # Taslak Release: yayımlamak insan onayıyla, GitHub arayüzünden yapılır.
       - name: Taslak Release oluştur
         env:
@@ -281,4 +296,4 @@ jobs:
           ETIKET: ${{ github.ref_name }}
         run: |
           gh release create "$ETIKET" cikti/* --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
-            --title "BulutBelge $ETIKET" --notes "Taslak. İmzasız derleme; SHA256SUMS ile doğrulayın."
+            --title "BulutBelge $ETIKET" --notes "Taslak. İmzasız derleme; SHA256SUMS ile doğrulayın. bulutbelge-mcp-*.mcpb: yerel MCP sunucusu (masaüstü uygulaması kurulu olmalı); Release yayımlanınca MCP kaydına mcp-kayit.yml yazar."

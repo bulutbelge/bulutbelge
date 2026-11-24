@@ -45,7 +45,8 @@ EXIT_CODES: dict[int, tuple[str, str]] = {
     ),
     EXIT_USAGE: ("Kullanım hatası (yanlış argüman, kural takımı yok)", "Komutu düzelt"),
     EXIT_REFUSED: (
-        "İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu, atanandan gevşek kural takımı",
+        "İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu, atanandan gevşek kural takımı, "
+        "masaüstü uygulaması kurulu değil",
         "**Dur**, mesajı aynen ilet; izni aşmaya çalışma",
     ),
     EXIT_LOG: ("İşlem günlüğü yazılamıyor; güvenlik için işlem yapılmadı", "**Dur**, kullanıcıya bildir"),
@@ -364,7 +365,7 @@ def _run(argv: list[str], stdout, stderr, stdin=None) -> int:
         stderr.write(f"Hata ({exc.code}): {exc.message}\n")
         if exc.code == "log_unwritable":
             return EXIT_LOG
-        if exc.code in journal.REFUSALS:
+        if exc.code in journal.REFUSALS or exc.code == ajan.APP_NOT_INSTALLED:
             return EXIT_REFUSED
         return EXIT_USAGE if exc.code in ("invalid_params", "no_data_dir") else EXIT_ERROR
     except Exception as exc:  # noqa: BLE001 - mesaj içerik taşıyabilir; yalnızca tür

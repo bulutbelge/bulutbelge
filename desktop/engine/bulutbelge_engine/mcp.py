@@ -106,7 +106,7 @@ def _exit_code(code: str) -> int:
 
     if code == "log_unwritable":
         return EXIT_LOG
-    if code in journal.REFUSALS:
+    if code in journal.REFUSALS or code == ajan.APP_NOT_INSTALLED:
         return EXIT_REFUSED
     return EXIT_USAGE if code in ("invalid_params", "no_data_dir") else EXIT_ERROR
 

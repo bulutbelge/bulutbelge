@@ -49,7 +49,7 @@ Ayarlar'daki **Ajan yönergesini kopyala** düğmesi aşağıdaki hazır yönerg
 |---|---|
 | Windows, NSIS kurulumu (önerilen) | `bulutbelge <komut>`: kurulum, klasörü kullanıcının PATH'ine ekler ve `bulutbelge` kısa adını yazar (**yeni açılan** terminalde geçerli). Dosya: `%LOCALAPPDATA%\BulutBelge\engine\bulutbelge-engine.exe` |
 | Windows, MSI | MSI PATH'e dokunmaz: `"<kurulum klasörü>\engine\bulutbelge-engine.exe" <komut>`. Varsayılan kurulum klasörü `C:\Program Files\BulutBelge`; Kurulum klasörünü PowerShell'de `(Get-ItemProperty 'HKCU:\Software\proteksistem\BulutBelge').InstallDir` gösterir |
-| macOS | `/Applications/BulutBelge.app/Contents/Resources/engine/bulutbelge-engine <komut> ...` (macOS'ta denenmedi) |
+| macOS | `/Applications/BulutBelge.app/Contents/Resources/engine/bulutbelge-engine <komut> ...` (macOS kurulumu `bulutbelge` kısa adını PATH'e eklemez; tam yolu yazın) |
 | Linux (.deb) | `bulutbelge <komut> ...` (paket `/usr/bin/bulutbelge` kısa adını ve `man bulutbelge` sayfasını kurar; tam yol `/usr/lib/BulutBelge/engine/bulutbelge-engine`. Linux'ta denenmedi; AppImage'da komut satırı yoktur, .deb kullanın) |
 | Geliştirme ortamı | `desktop/engine/.venv/bin/python -m bulutbelge_engine.cli <komut>` (Windows: `.venv\Scripts\python.exe`) |
 | `pip install -e desktop/engine` yapıldıysa | `bulutbelge <komut>` |
@@ -121,13 +121,14 @@ Maskelenen: 3
 | 0 | Başarılı | Devam et |
 | 1 | Belge ya da işlem hatası (bozuk dosya, desteklenmeyen biçim, **kaçak denetimi**, OCR kullanılamıyor) | Hata mesajını kullanıcıya ilet; dosyayı başka yoldan okuma |
 | 2 | Kullanım hatası (yanlış argüman, kural takımı yok) | Komutu düzelt |
-| 3 | İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu, atanandan gevşek kural takımı | **Dur**, mesajı aynen ilet; izni aşmaya çalışma |
+| 3 | İzin yok: dosya izinli klasör dışında, yazma izni yok, kasa koşulu, atanandan gevşek kural takımı, masaüstü uygulaması kurulu değil | **Dur**, mesajı aynen ilet; izni aşmaya çalışma |
 | 4 | İşlem günlüğü yazılamıyor; güvenlik için işlem yapılmadı | **Dur**, kullanıcıya bildir |
 
 ### Sık görülenler
 
 | Mesaj / durum | Anlamı ve çözüm |
 |---|---|
+| Çıkış 3, `app_not_installed` | Masaüstü uygulaması kurulu değil ya da hiç açılmamış (ayar klasörü yok). Ajan komutu ve MCP sunucusu (MCPB paketi dahil) yalnızca uygulamanın ayarlarıyla çalışır: kullanıcı uygulamayı kurup bir kez açmalı ve klasör izni vermeli. |
 | Çıkış 3, "izinli klasör yok" | Kullanıcı Ayarlar › Ajan erişimi'nde klasör eklememiş. Kullanıcıdan isteyin. |
 | Çıkış 3, "kural takımı, ajan için atanan takımdan gevşek" | `--profil` ile seçilen takım, atanan takımın maskelediği bir türü açık bırakıyor. `--profil` vermeyin (atanan takım kullanılır) ya da daha sıkı bir takım seçin. |
 | Çıkış 3, hedef izinli klasör dışında | `--hedef` yolu izinli klasörlerin altında olmalı (ya da kullanıcı hedef klasörü de eklemeli). |
@@ -159,6 +160,12 @@ claude mcp add bulutbelge -- bulutbelge mcp
 
 Komut PATH'te değilse tam yolu yazın, ör. varsayılan MSI kurulumunda `claude mcp add bulutbelge -- "C:\Program Files\BulutBelge\engine\bulutbelge-engine.exe" mcp` (bu kurulumdaki yol: `bulutbelge kilavuz --yonerge` çıktısındaki komut).
 
+macOS'ta (kısa ad yok, tam yol gerekir):
+
+```
+claude mcp add bulutbelge -- /Applications/BulutBelge.app/Contents/Resources/engine/bulutbelge-engine mcp
+```
+
 **Cursor** (`~/.cursor/mcp.json` ya da projede `.cursor/mcp.json`):
 
 ```json
@@ -174,6 +181,8 @@ args = ["mcp"]
 ```
 
 JSON yapılandırmalarında Windows yolundaki ters eğik çizgiler ikilenir (`"C:\\Program Files\\..."`). `BULUTBELGE_GELISTIRME` değişkenini MCP yapılandırmasına eklemeyin (ayar klasörü yalnızca geliştirmede değişebilir).
+
+**MCPB paketi (Claude Desktop ve MCPB destekleyen araçlar):** 0.1.2'den itibaren her sürümde platform başına bir `bulutbelge-mcp-<sürüm>-<platform>.mcpb` dosyası yayımlanır (`macos-arm64`, `windows-x64`, `linux-x64`; GitHub Releases, özetler SHA256SUMS'ta). Dosya ajan aracında açılınca (Claude Desktop: çift tıklama ya da Ayarlar › Uzantılar) sunucu yukarıdaki elle yapılandırmaya gerek kalmadan eklenir. Sunucu resmî MCP kaydında `io.github.bulutbelge/bulutbelge` adıyla listelenir. Paketin içindeki motor uygulamadakinin aynısıdır ve **masaüstü uygulamasının ayarlarını** kullanır: izinli klasörler, kural takımı ve işlem günlüğü uygulamada kalır, paket bunları kuramaz ve başka klasöre yönlendirilemez. Uygulama kurulu değilse (ya da hiç açılmamışsa) araçlar `app_not_installed` hatası döndürür (çıkış 3): kullanıcıya uygulamayı https://bulutbelge.com/indir adresinden kurup bir kez açmasını ve Ayarlar › Ajan erişimi bölümünden klasör izni vermesini söyleyin.
 
 ## JSON çıktı şeması
 

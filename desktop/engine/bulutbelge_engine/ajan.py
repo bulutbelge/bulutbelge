@@ -10,6 +10,7 @@ Ayar klasörü (`BULUTBELGE_DATA_DIR`) çağırmadan önce ayarlanmış olmalıd
 
 from __future__ import annotations
 
+import os
 import re
 import time
 from pathlib import Path
@@ -39,11 +40,30 @@ def clean_agent_name(raw: Any, default: str = "ajan") -> str:
     return text if valid_agent_name(text) else default
 
 
+# Masaüstü uygulaması kurulu değil (ya da hiç açılmamış): ayar klasörü yok. Ajan komutu (CLI, MCP ve MCPB
+# paketi içinden çalışan motor) yalnızca uygulamanın ayarlarıyla çalışır; klasörü kendisi kurmaz, izin uydurmaz.
+APP_NOT_INSTALLED = "app_not_installed"
+APP_NOT_INSTALLED_MESSAGE = (
+    "BulutBelge masaüstü uygulaması bu bilgisayarda kurulu değil ya da hiç açılmamış (uygulamanın ayar klasörü "
+    "yok). Ajan erişimi uygulamanın ayarlarıyla (izinli klasörler, kural takımları, işlem günlüğü) çalışır: "
+    "uygulamayı https://bulutbelge.com/indir adresinden kurun, bir kez açın ve Ayarlar › Ajan erişimi "
+    "bölümünden klasör izni verin."
+)
+
+
+def require_app() -> None:
+    """Ayar klasörü yoksa (uygulama kurulu değil) dur. Klasör oluşturulmaz; işlem günlüğüne yazılamaz."""
+    raw = os.environ.get("BULUTBELGE_DATA_DIR")
+    if not raw or not Path(raw).is_dir():
+        raise EngineError(APP_NOT_INSTALLED, APP_NOT_INSTALLED_MESSAGE)
+
+
 def label(type_key: str) -> str:
     return DATA_TYPES[type_key].label if type_key in DATA_TYPES else type_key
 
 
 def folders() -> dict[str, Any]:
+    require_app()
     cfg = settings.load_agent()
     return {"folders": cfg["folders"], "allow_write": cfg["allow_write"]}
 
@@ -68,6 +88,7 @@ def _prepare(op: str, path: str, wanted: str | None) -> tuple[dict[str, Any], st
     """İzin denetimi: (ajan ayarı, kaynak yolu, kural takımı, motor kuralları). Reddedilen istek günlüğe girer."""
     if not isinstance(path, str) or not path.strip():
         raise EngineError("invalid_params", "Dosya yolu gerekli")
+    require_app()
     agent_cfg = settings.load_agent()
     source = str(Path(path).absolute())
     profile = _profile(op, source, wanted, agent_cfg)
