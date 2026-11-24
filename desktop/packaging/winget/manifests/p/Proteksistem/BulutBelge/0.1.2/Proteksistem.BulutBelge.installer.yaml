@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+# Kurulum dosyası MSI (WiX). NSIS setup.exe imzasız olduğu için winget ile sessiz kurulumda SmartScreen onayında
+# bekliyordu (Windows denemesi iş akışı, 24 Kasım 2026); winget MSI'ı Windows Installer ile kurar, bu onay çıkmaz.
+# Değerler 0.1.2 MSI'larının Property tablosundan okundu (yayıncı "Proteksistem", tauri.conf.json bundle.publisher).
+PackageIdentifier: Proteksistem.BulutBelge
+PackageVersion: 0.1.2
+InstallerType: wix
+Scope: machine
+InstallModes:
+- interactive
+- silent
+- silentWithProgress
+UpgradeBehavior: install
+ElevationRequirement: elevatesSelf
+ReleaseDate: 2026-11-25
+InstallationMetadata:
+  DefaultInstallLocation: '%ProgramFiles%\BulutBelge'
+Installers:
+- Architecture: x64
+  InstallerLocale: tr-TR
+  InstallerUrl: https://github.com/bulutbelge/bulutbelge/releases/download/v0.1.2/BulutBelge_0.1.2_x64_tr-TR.msi
+  InstallerSha256: 7E5EC2AD8C7195977B0C003AE451A13F1D5F7E648C58F03C7CE8E26611498280
+  ProductCode: '{6CAA4D89-6B32-47DC-BD4B-AD199701EC68}'
+  AppsAndFeaturesEntries:
+  - DisplayName: BulutBelge
+    Publisher: Proteksistem
+    DisplayVersion: 0.1.2
+    ProductCode: '{6CAA4D89-6B32-47DC-BD4B-AD199701EC68}'
+    UpgradeCode: '{E8581453-4A71-5F24-BB39-23441D15335A}'
+- Architecture: x64
+  InstallerLocale: en-US
+  InstallerUrl: https://github.com/bulutbelge/bulutbelge/releases/download/v0.1.2/BulutBelge_0.1.2_x64_en-US.msi
+  InstallerSha256: 4DD8ABF651AC5072E8EA92E0BB93E7E4CE09C32214887C43845AC340D70CA2A1
+  ProductCode: '{6D630D16-7D96-44C5-9C1C-85F5D55B9850}'
+  AppsAndFeaturesEntries:
+  - DisplayName: BulutBelge
+    Publisher: Proteksistem
+    DisplayVersion: 0.1.2
+    ProductCode: '{6D630D16-7D96-44C5-9C1C-85F5D55B9850}'
+    UpgradeCode: '{E8581453-4A71-5F24-BB39-23441D15335A}'
+ManifestType: installer
+ManifestVersion: 1.10.0
