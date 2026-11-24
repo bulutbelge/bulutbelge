@@ -16,6 +16,7 @@ param(
     [int] $Bekleme2 = 300
 )
 
+# Not: PowerShell değişken adları büyük/küçük harfe duyarsızdır; parametrelerle aynı adı kullanmayın.
 $ErrorActionPreference = 'Continue'
 # Bir bölüm hata verirse kaydedilir, sonraki bölümler yine çalışır.
 trap { Yaz "HATA: $($_.Exception.Message) (satır $($_.InvocationInfo.ScriptLineNumber))"; $script:Hatalar++; continue }
@@ -142,27 +143,27 @@ Yaz ""
 Yaz "1) Karşılaştırma: eski 0.1.1, temiz profil"
 Nsis-Kaldir; Remove-Item $Profil -Recurse -Force -ErrorAction SilentlyContinue
 $k = Nsis-Kur $Eski; Yaz "  kurulum çıkış kodu $k"
-$eski = Olc 'eski' @($Bekleme1, $Bekleme2)
+$olcEski = Olc 'eski' @($Bekleme1, $Bekleme2)
 $eskiMod = Dns-Modu; Yaz "  Local State dns_over_https.mode: $eskiMod"
 
 Yaz ""
 Yaz "2) Yeni paket, eski profilin üzerine"
 $k = Nsis-Kur $Setup; Yaz "  kurulum çıkış kodu $k"
-$ust = Olc 'yeni (üzerine)' @($Bekleme1, $Bekleme2)
+$olcUst = Olc 'yeni (üzerine)' @($Bekleme1, $Bekleme2)
 $ustMod = Dns-Modu; Yaz "  Local State dns_over_https.mode: $ustMod"
 
 Yaz ""
 Yaz "3) Yeni paket, temiz profil"
 Nsis-Kaldir; Remove-Item $Profil -Recurse -Force -ErrorAction SilentlyContinue
 $k = Nsis-Kur $Setup; Yaz "  kurulum çıkış kodu $k"
-$temiz = Olc 'yeni (temiz)' @($Bekleme1, $Bekleme2)
+$olcTemiz = Olc 'yeni (temiz)' @($Bekleme1, $Bekleme2)
 $temizMod = Dns-Modu; Yaz "  Local State dns_over_https.mode: $temizMod"
 
 Yaz ""
 Yaz "Sonuç:"
-Sonuc 'B' 'Ölçüm düzeneği sorunu yakalıyor (eski 0.1.1 DoH adresine bağlanıyor)' (DoH-Var $eski) 'yakalamazsa yeni sonuçlar kanıt sayılmaz'
-Sonuc 'B' 'Yeni paket, eski profil üzerine: DoH bağlantısı yok' (-not (DoH-Var $ust))
-Sonuc 'B' 'Yeni paket, temiz profil: DoH bağlantısı yok' (-not (DoH-Var $temiz))
+Sonuc 'B' 'Ölçüm düzeneği sorunu yakalıyor (eski 0.1.1 DoH adresine bağlanıyor)' (DoH-Var $olcEski) 'yakalamazsa yeni sonuçlar kanıt sayılmaz'
+Sonuc 'B' 'Yeni paket, eski profil üzerine: DoH bağlantısı yok' (-not (DoH-Var $olcUst))
+Sonuc 'B' 'Yeni paket, temiz profil: DoH bağlantısı yok' (-not (DoH-Var $olcTemiz))
 Sonuc 'B' 'Local State dns_over_https.mode = off (iki durumda)' (($ustMod -eq 'off') -and ($temizMod -eq 'off')) "üzerine: $ustMod, temiz: $temizMod"
 
 Set-DnsClientServerAddress -InterfaceIndex $ad.ifIndex -ResetServerAddresses
@@ -237,28 +238,101 @@ $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$MsiTr`"", '/qn' -Wait -Pa
 Sonuc 'MSI' 'Kaldırma sonrası InstallDir anahtarı silindi' (-not (Test-Path 'HKCU:\Software\proteksistem\BulutBelge')) "msiexec /x çıkış $($p.ExitCode)"
 
 # --- winget yerel manifest ------------------------------------------------------------------------------------
+# Deneme 6 ve ilk otomatik koşu: NSIS manifestiyle sessiz kurulum "Starting package install..." aşamasında bekledi,
+# aynı setup.exe doğrudan /S ile kuruluyordu. Bekleme sırasında açık pencereler ve indirilen dosyanın internet
+# işareti (Zone.Identifier) kaydedilir; aynı sürümün MSI paketleriyle hazırlanmış manifest de denenir.
+function Winget-Kur([string] $Man, [string] $Ad, [int] $Sure = 300) {
+    $cikti = Join-Path $env:RUNNER_TEMP "winget-$Ad.txt"
+    $basla = Get-Date
+    $wi = Start-Process $wg.Source -ArgumentList 'install', '--manifest', "`"$Man`"", '--silent', '--accept-package-agreements',
+        '--accept-source-agreements', '--disable-interactivity' -PassThru -RedirectStandardOutput $cikti
+    $bitti = $wi.WaitForExit(90000)
+    if (-not $bitti) {
+        Yaz "  90 sn sonra hâlâ sürüyor; tanılama:"
+        Get-Process | Where-Object { $_.StartTime -ge $basla -and $_.Id -ne $wi.Id } | ForEach-Object {
+            Yaz ("    süreç {0} (pencere: '{1}')" -f $_.ProcessName, $_.MainWindowTitle)
+        }
+        Get-ChildItem (Join-Path $env:TEMP 'WinGet') -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in '.exe', '.msi' } | ForEach-Object {
+                $z = Get-Content -Path $_.FullName -Stream Zone.Identifier -ErrorAction SilentlyContinue
+                Yaz ("    indirilen {0}: Zone.Identifier {1}" -f $_.Name, $(if ($z) { ($z -join ' ') } else { 'yok' }))
+            }
+        $bitti = $wi.WaitForExit(($Sure - 90) * 1000)
+    }
+    if (-not $bitti) {
+        Get-Process | Where-Object { $_.StartTime -ge $basla } | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+    $son = (Get-Content $cikti -ErrorAction SilentlyContinue | Where-Object { $_ -match '[A-Za-z]' } | Select-Object -Last 3) -join ' / '
+    Yaz "  winget: $($son -replace '[\\|/-]\s+', '' -replace '\s{2,}', ' ')"
+    return @{ Bitti = $bitti; Kod = $(if ($bitti) { $wi.ExitCode } else { 'zaman aşımı' }) }
+}
+
+function Winget-Kaldir {
+    & $wg.Source uninstall --id Proteksistem.BulutBelge --silent --disable-interactivity --accept-source-agreements *> $null
+    Uygulamayi-Kapat
+}
+
 Yaz ""
-Yaz "## winget yerel manifest (0.1.1, GitHub Releases'taki resmî kurulum dosyası)"
+Yaz "## winget yerel manifest (0.1.1, GitHub Releases'taki resmî kurulum dosyaları)"
 $wg = Get-Command winget -ErrorAction SilentlyContinue
 if (-not $wg) {
     Yaz "winget bu makinede yok; bölüm atlandı."
 } else {
-    Yaz "winget $(winget --version)"
+    Yaz "winget $(& $wg.Source --version)"
+    & $wg.Source settings --enable LocalManifestFiles *> $null
+
+    Yaz ""
+    Yaz "1) Depodaki manifest (NSIS setup.exe)"
     $man = Join-Path $Depo 'desktop\packaging\winget\manifests\p\Proteksistem\BulutBelge\0.1.1'
-    $v = winget validate --manifest $man 2>&1 | Out-String
-    Sonuc 'winget' 'Manifest doğrulaması' ($LASTEXITCODE -eq 0 -or $v -match 'succeeded|başarılı') ($v.Trim() -replace '\s+', ' ')
-    winget settings --enable LocalManifestFiles *> $null
-    $wi = Start-Process $wg.Source -ArgumentList 'install', '--manifest', "`"$man`"", '--silent', '--accept-package-agreements',
-        '--accept-source-agreements', '--disable-interactivity' -PassThru -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'winget.txt')
-    $bitti = $wi.WaitForExit(600000)
-    if (-not $bitti) { Stop-Process -Id $wi.Id -Force -ErrorAction SilentlyContinue }
-    Yaz ((Get-Content (Join-Path $env:RUNNER_TEMP 'winget.txt') -Raw -ErrorAction SilentlyContinue) -replace '[^\x20-\x7EÀ-ſ\r\n]', '' | Select-Object -Last 1)
-    Sonuc 'winget' 'Sessiz kurulum 10 dk içinde bitti (bekleyen pencere yok)' $bitti "çıkış $(if ($bitti) { $wi.ExitCode } else { 'zaman aşımı' })"
-    $l = winget list --id Proteksistem.BulutBelge --accept-source-agreements --disable-interactivity 2>&1 | Out-String
-    Sonuc 'winget' 'winget list paketi tanıyor' ($l -match 'Proteksistem\.BulutBelge') (($l -split "`n" | Select-String 'BulutBelge' | Select-Object -First 1) -replace '\s+', ' ')
-    winget uninstall --id Proteksistem.BulutBelge --silent --disable-interactivity --accept-source-agreements *> $null
-    Sonuc 'winget' 'winget ile kaldırıldı' (-not (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\BulutBelge'))
-    winget settings --disable LocalManifestFiles *> $null
+    $v = & $wg.Source validate --manifest $man 2>&1 | Out-String
+    Sonuc 'winget' 'NSIS manifest doğrulaması' ($v -match 'succeeded') ($v.Trim() -replace '\s+', ' ')
+    $r = Winget-Kur $man 'nsis'
+    Sonuc 'winget' 'NSIS manifest: sessiz kurulum 5 dk içinde bitti' $r.Bitti "çıkış $($r.Kod)"
+    if ($r.Bitti) {
+        $l = & $wg.Source list --id Proteksistem.BulutBelge --accept-source-agreements --disable-interactivity 2>&1 | Out-String
+        Sonuc 'winget' 'NSIS manifest: winget list paketi tanıyor' ($l -match 'Proteksistem\.BulutBelge')
+    }
+    Winget-Kaldir; Nsis-Kaldir
+
+    Yaz ""
+    Yaz "2) Deneme: aynı sürümün MSI paketleriyle manifest (tr-TR ve en-US, makine kapsamı)"
+    $taban = 'https://github.com/bulutbelge/bulutbelge/releases/download/v0.1.1'
+    $msiDir = Join-Path $env:RUNNER_TEMP 'winget-msi'
+    New-Item -ItemType Directory -Force -Path $msiDir | Out-Null
+    $kurulumlar = foreach ($dil in 'tr-TR', 'en-US') {
+        $dosya = "BulutBelge_0.1.1_x64_$dil.msi"
+        $yerel = Join-Path $env:RUNNER_TEMP $dosya
+        Invoke-WebRequest "$taban/$dosya" -OutFile $yerel -UseBasicParsing
+        "- Architecture: x64`n  InstallerLocale: $dil`n  InstallerUrl: $taban/$dosya`n  InstallerSha256: $((Get-FileHash $yerel -Algorithm SHA256).Hash)"
+    }
+    @"
+PackageIdentifier: Proteksistem.BulutBelge
+PackageVersion: 0.1.1
+InstallerType: wix
+Scope: machine
+InstallModes:
+- interactive
+- silent
+UpgradeBehavior: install
+Installers:
+$($kurulumlar -join "`n")
+ManifestType: installer
+ManifestVersion: 1.10.0
+"@ | Set-Content (Join-Path $msiDir 'Proteksistem.BulutBelge.installer.yaml') -Encoding utf8
+    Copy-Item (Join-Path $man 'Proteksistem.BulutBelge.yaml'), (Join-Path $man 'Proteksistem.BulutBelge.locale.*.yaml') $msiDir
+    $v = & $wg.Source validate --manifest $msiDir 2>&1 | Out-String
+    Sonuc 'winget' 'MSI manifest doğrulaması' ($v -match 'succeeded') ($v.Trim() -replace '\s+', ' ')
+    $r = Winget-Kur $msiDir 'msi'
+    Sonuc 'winget' 'MSI manifest: sessiz kurulum 5 dk içinde bitti' $r.Bitti "çıkış $($r.Kod)"
+    if ($r.Bitti) {
+        $l = & $wg.Source list --id Proteksistem.BulutBelge --accept-source-agreements --disable-interactivity 2>&1 | Out-String
+        Sonuc 'winget' 'MSI manifest: winget list paketi tanıyor' ($l -match 'Proteksistem\.BulutBelge')
+        Sonuc 'winget' 'MSI manifest: Program Files altına kuruldu' (Test-Path (Join-Path $env:ProgramFiles 'BulutBelge'))
+    }
+    Winget-Kaldir
+    Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | ForEach-Object { Get-ItemProperty $_.PSPath } |
+        Where-Object DisplayName -eq 'BulutBelge' | ForEach-Object { Start-Process msiexec.exe -ArgumentList '/x', $_.PSChildName, '/qn' -Wait }
+    & $wg.Source settings --disable LocalManifestFiles *> $null
 }
 
 # --- Özet ------------------------------------------------------------------------------------------------------
