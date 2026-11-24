@@ -254,6 +254,9 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+      # Derleme kanıtı (Sigstore): kısa ömürlü OIDC kimliği ve kanıtın depoya yazılması için.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -264,6 +267,13 @@ jobs:
         working-directory: cikti
         run: |
           find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\n' | LC_ALL=C sort | xargs sha256sum | tee SHA256SUMS
+      # Derleme kanıtı (SLSA provenance, Sigstore ile imzalı, herkese açık şeffaflık kaydında): her kurulum dosyasının
+      # bu depodan, bu etiketten ve bu iş akışıyla üretildiğini kanıtlar. Windows'ta kod imzası olmadığı için kullanıcıya
+      # sunulan bağımsız doğrulama budur: gh attestation verify <dosya> -R bulutbelge/bulutbelge
+      - name: Derleme kanıtı (Sigstore)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: "cikti/BulutBelge_*"
       # Taslak Release: yayımlamak insan onayıyla, GitHub arayüzünden yapılır.
       - name: Taslak Release oluştur
         env:
