@@ -16,6 +16,10 @@ on:
         description: "WebView2 DNS ölçümünde karşılaştırılacak eski sürüm etiketi"
         type: string
         default: "v0.1.1"
+      sadece_winget:
+        description: "Yalnızca winget bölümü (manifest değişikliğinden sonra hızlı deneme)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -58,10 +62,13 @@ jobs:
         run: python desktop/scripts/windows_deneme_belgeler.py uret "${{ runner.temp }}/belgeler"
       - name: Deneme
         shell: pwsh
+        env:
+          SADECE_WINGET: ${{ inputs.sadece_winget }}
         run: |
           $eski = Get-ChildItem "$env:RUNNER_TEMP\eski" -Filter '*_x64-setup.exe' | Select-Object -First 1 -ExpandProperty FullName
           ./desktop/scripts/windows_deneme.ps1 -Paket "$env:RUNNER_TEMP\paket" -Eski $eski `
-            -Belgeler "$env:RUNNER_TEMP\belgeler" -Depo $env:GITHUB_WORKSPACE -Rapor "$env:RUNNER_TEMP\rapor.md"
+            -Belgeler "$env:RUNNER_TEMP\belgeler" -Depo $env:GITHUB_WORKSPACE -Rapor "$env:RUNNER_TEMP\rapor.md" `
+            -SadeceWinget:([bool]::Parse($env:SADECE_WINGET))
       - name: Rapor
         if: always()
         shell: pwsh

@@ -13,7 +13,8 @@ param(
     [Parameter(Mandatory)] [string] $Depo,      # depo kökü
     [Parameter(Mandatory)] [string] $Rapor,     # yazılacak Markdown rapor
     [int] $Bekleme1 = 120,
-    [int] $Bekleme2 = 300
+    [int] $Bekleme2 = 300,
+    [switch] $SadeceWinget       # yalnızca winget bölümü (manifest değişikliğinden sonra hızlı deneme)
 )
 
 # Not: PowerShell değişken adları büyük/küçük harfe duyarsızdır; parametrelerle aynı adı kullanmayın.
@@ -125,6 +126,7 @@ Get-ChildItem $Paket -File | ForEach-Object {
 $Setup = Get-ChildItem $Paket -Filter '*x64-setup.exe' | Where-Object { $_.Name -notmatch 'cevrimdisi' } | Select-Object -First 1 -ExpandProperty FullName
 $MsiTr = Get-ChildItem $Paket -Filter '*tr-TR.msi' | Where-Object { $_.Name -notmatch 'cevrimdisi' } | Select-Object -First 1 -ExpandProperty FullName
 
+if (-not $SadeceWinget) {
 # --- B. WebView2 şifreli DNS --------------------------------------------------------------------------------
 Yaz ""
 Yaz "## B. WebView2 şifreli DNS (W.1)"
@@ -237,6 +239,8 @@ if ($me) { & $me --help *> $null; Sonuc 'MSI' 'Motor --help çalışıyor' ($LAS
 $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$MsiTr`"", '/qn' -Wait -PassThru
 Sonuc 'MSI' 'Kaldırma sonrası InstallDir anahtarı silindi' (-not (Test-Path 'HKCU:\Software\proteksistem\BulutBelge')) "msiexec /x çıkış $($p.ExitCode)"
 
+}
+
 # --- winget yerel manifest ------------------------------------------------------------------------------------
 # Deneme 6 ve ilk otomatik koşu: NSIS manifestiyle sessiz kurulum "Starting package install..." aşamasında bekledi,
 # aynı setup.exe doğrudan /S ile kuruluyordu. Bekleme sırasında açık pencereler ve indirilen dosyanın internet
@@ -282,10 +286,15 @@ if (-not $wg) {
     Sonuc 'winget' 'Sessiz kurulum 5 dk içinde bitti (SmartScreen beklemesi yok)' $r.Bitti "çıkış $($r.Kod)"
     if ($r.Bitti) {
         Sonuc 'winget' 'Program Files altına kuruldu' (Test-Path (Join-Path $env:ProgramFiles 'BulutBelge'))
-        $l = & $wg.Source list --id Proteksistem.BulutBelge --accept-source-agreements --disable-interactivity 2>&1 | Out-String
+        # Yerel manifestle kurulan paket bir kaynağa bağlı olmadığından `winget list --id` onu tanımaz; winget kurulu
+        # programı ProductCode ile görür. Paket winget deposuna girince eşleşme bu kod üzerinden yapılır.
+        $kodlar = (Select-String -Path (Join-Path $man 'Proteksistem.BulutBelge.installer.yaml') -Pattern "ProductCode: '(\{[0-9A-F-]+\})'" -AllMatches).Matches |
+            ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+        $l = & $wg.Source list --name BulutBelge --accept-source-agreements --disable-interactivity 2>&1 | Out-String
         $satir = ($l -split "`n" | Where-Object { $_ -match 'BulutBelge' } | Select-Object -First 1) -replace '\s+', ' '
-        Sonuc 'winget' 'winget list paketi kimliğiyle tanıyor' ($l -match 'Proteksistem\.BulutBelge') "$satir"
-        & $wg.Source uninstall --id Proteksistem.BulutBelge --silent --disable-interactivity --accept-source-agreements *> $null
+        $eslesen = @($kodlar | Where-Object { $l -match [regex]::Escape($_) })
+        Sonuc 'winget' 'winget list kurulu programı manifestteki ProductCode ile görüyor' ($eslesen.Count -ge 1) "$satir"
+        & $wg.Source uninstall --manifest $man --silent --disable-interactivity --accept-source-agreements *> $null
         $kalan = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | ForEach-Object { Get-ItemProperty $_.PSPath } |
             Where-Object DisplayName -eq 'BulutBelge'
         Sonuc 'winget' 'winget ile kaldırıldı' (-not $kalan)
