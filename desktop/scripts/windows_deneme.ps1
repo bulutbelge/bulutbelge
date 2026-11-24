@@ -176,7 +176,7 @@ Yaz "## Program Ekle/Kaldır kaydı (NSIS)"
 $arp = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\BulutBelge' -ErrorAction SilentlyContinue
 Yaz "DisplayName '$($arp.DisplayName)', Publisher '$($arp.Publisher)', DisplayVersion '$($arp.DisplayVersion)'"
 Sonuc 'Kayıt' "NSIS yayıncı adı 'Proteksistem'" ($arp.Publisher -ceq 'Proteksistem') "$($arp.Publisher)"
-Sonuc 'Kayıt' 'winget AppsAndFeaturesEntries ile aynı ad ve ürün kodu' (($arp.DisplayName -eq 'BulutBelge') -and ($null -ne $arp)) 'ProductCode = BulutBelge anahtarı'
+Sonuc 'Kayıt' 'NSIS kaydı BulutBelge anahtarında, ad BulutBelge' (($null -ne $arp) -and ($arp.DisplayName -eq 'BulutBelge'))
 
 # --- D ve F: komut satırıyla sahte belgeler ----------------------------------------------------------------
 Yaz ""
@@ -240,7 +240,7 @@ Sonuc 'MSI' 'Kaldırma sonrası InstallDir anahtarı silindi' (-not (Test-Path '
 # --- winget yerel manifest ------------------------------------------------------------------------------------
 # Deneme 6 ve ilk otomatik koşu: NSIS manifestiyle sessiz kurulum "Starting package install..." aşamasında bekledi,
 # aynı setup.exe doğrudan /S ile kuruluyordu. Bekleme sırasında açık pencereler ve indirilen dosyanın internet
-# işareti (Zone.Identifier) kaydedilir; aynı sürümün MSI paketleriyle hazırlanmış manifest de denenir.
+# işareti (Zone.Identifier) kaydedilir. Neden SmartScreen'di; manifest bu yüzden MSI'a geçti (winget/README.md).
 function Winget-Kur([string] $Man, [string] $Ad, [int] $Sure = 300) {
     $cikti = Join-Path $env:RUNNER_TEMP "winget-$Ad.txt"
     $basla = Get-Date
@@ -267,71 +267,29 @@ function Winget-Kur([string] $Man, [string] $Ad, [int] $Sure = 300) {
     return @{ Bitti = $bitti; Kod = $(if ($bitti) { $wi.ExitCode } else { 'zaman aşımı' }) }
 }
 
-function Winget-Kaldir {
-    & $wg.Source uninstall --id Proteksistem.BulutBelge --silent --disable-interactivity --accept-source-agreements *> $null
-    Uygulamayi-Kapat
-}
-
 Yaz ""
-Yaz "## winget yerel manifest (0.1.1, GitHub Releases'taki resmî kurulum dosyaları)"
+Yaz "## winget yerel manifest (depodaki 0.1.1 manifesti: MSI, GitHub Releases'taki resmî dosyalar)"
 $wg = Get-Command winget -ErrorAction SilentlyContinue
 if (-not $wg) {
     Yaz "winget bu makinede yok; bölüm atlandı."
 } else {
     Yaz "winget $(& $wg.Source --version)"
     & $wg.Source settings --enable LocalManifestFiles *> $null
-
-    Yaz ""
-    Yaz "1) Depodaki manifest (NSIS setup.exe)"
     $man = Join-Path $Depo 'desktop\packaging\winget\manifests\p\Proteksistem\BulutBelge\0.1.1'
     $v = & $wg.Source validate --manifest $man 2>&1 | Out-String
-    Sonuc 'winget' 'NSIS manifest doğrulaması' ($v -match 'succeeded') ($v.Trim() -replace '\s+', ' ')
-    $r = Winget-Kur $man 'nsis'
-    Sonuc 'winget' 'NSIS manifest: sessiz kurulum 5 dk içinde bitti' $r.Bitti "çıkış $($r.Kod)"
+    Sonuc 'winget' 'Manifest doğrulaması' ($v -match 'succeeded') ($v.Trim() -replace '\s+', ' ')
+    $r = Winget-Kur $man 'msi'
+    Sonuc 'winget' 'Sessiz kurulum 5 dk içinde bitti (SmartScreen beklemesi yok)' $r.Bitti "çıkış $($r.Kod)"
     if ($r.Bitti) {
+        Sonuc 'winget' 'Program Files altına kuruldu' (Test-Path (Join-Path $env:ProgramFiles 'BulutBelge'))
         $l = & $wg.Source list --id Proteksistem.BulutBelge --accept-source-agreements --disable-interactivity 2>&1 | Out-String
-        Sonuc 'winget' 'NSIS manifest: winget list paketi tanıyor' ($l -match 'Proteksistem\.BulutBelge')
+        $satir = ($l -split "`n" | Where-Object { $_ -match 'BulutBelge' } | Select-Object -First 1) -replace '\s+', ' '
+        Sonuc 'winget' 'winget list paketi kimliğiyle tanıyor' ($l -match 'Proteksistem\.BulutBelge') "$satir"
+        & $wg.Source uninstall --id Proteksistem.BulutBelge --silent --disable-interactivity --accept-source-agreements *> $null
+        $kalan = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | ForEach-Object { Get-ItemProperty $_.PSPath } |
+            Where-Object DisplayName -eq 'BulutBelge'
+        Sonuc 'winget' 'winget ile kaldırıldı' (-not $kalan)
     }
-    Winget-Kaldir; Nsis-Kaldir
-
-    Yaz ""
-    Yaz "2) Deneme: aynı sürümün MSI paketleriyle manifest (tr-TR ve en-US, makine kapsamı)"
-    $taban = 'https://github.com/bulutbelge/bulutbelge/releases/download/v0.1.1'
-    $msiDir = Join-Path $env:RUNNER_TEMP 'winget-msi'
-    New-Item -ItemType Directory -Force -Path $msiDir | Out-Null
-    $kurulumlar = foreach ($dil in 'tr-TR', 'en-US') {
-        $dosya = "BulutBelge_0.1.1_x64_$dil.msi"
-        $yerel = Join-Path $env:RUNNER_TEMP $dosya
-        Invoke-WebRequest "$taban/$dosya" -OutFile $yerel -UseBasicParsing
-        "- Architecture: x64`n  InstallerLocale: $dil`n  InstallerUrl: $taban/$dosya`n  InstallerSha256: $((Get-FileHash $yerel -Algorithm SHA256).Hash)"
-    }
-    @"
-PackageIdentifier: Proteksistem.BulutBelge
-PackageVersion: 0.1.1
-InstallerType: wix
-Scope: machine
-InstallModes:
-- interactive
-- silent
-UpgradeBehavior: install
-Installers:
-$($kurulumlar -join "`n")
-ManifestType: installer
-ManifestVersion: 1.10.0
-"@ | Set-Content (Join-Path $msiDir 'Proteksistem.BulutBelge.installer.yaml') -Encoding utf8
-    Copy-Item (Join-Path $man 'Proteksistem.BulutBelge.yaml'), (Join-Path $man 'Proteksistem.BulutBelge.locale.*.yaml') $msiDir
-    $v = & $wg.Source validate --manifest $msiDir 2>&1 | Out-String
-    Sonuc 'winget' 'MSI manifest doğrulaması' ($v -match 'succeeded') ($v.Trim() -replace '\s+', ' ')
-    $r = Winget-Kur $msiDir 'msi'
-    Sonuc 'winget' 'MSI manifest: sessiz kurulum 5 dk içinde bitti' $r.Bitti "çıkış $($r.Kod)"
-    if ($r.Bitti) {
-        $l = & $wg.Source list --id Proteksistem.BulutBelge --accept-source-agreements --disable-interactivity 2>&1 | Out-String
-        Sonuc 'winget' 'MSI manifest: winget list paketi tanıyor' ($l -match 'Proteksistem\.BulutBelge')
-        Sonuc 'winget' 'MSI manifest: Program Files altına kuruldu' (Test-Path (Join-Path $env:ProgramFiles 'BulutBelge'))
-    }
-    Winget-Kaldir
-    Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | ForEach-Object { Get-ItemProperty $_.PSPath } |
-        Where-Object DisplayName -eq 'BulutBelge' | ForEach-Object { Start-Process msiexec.exe -ArgumentList '/x', $_.PSChildName, '/qn' -Wait }
     & $wg.Source settings --disable LocalManifestFiles *> $null
 }
 

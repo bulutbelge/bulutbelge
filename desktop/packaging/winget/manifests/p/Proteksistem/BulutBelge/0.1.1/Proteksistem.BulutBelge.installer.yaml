@@ -1,27 +1,42 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+# Kurulum dosyası MSI (WiX). NSIS setup.exe imzasız olduğu için winget ile sessiz kurulumda SmartScreen onayında
+# bekliyordu (Windows denemesi iş akışı, 24 Kasım 2026); winget MSI'ı Windows Installer ile kurar, bu onay çıkmaz.
+# Değerler 0.1.1 MSI'larının Property tablosundan okundu; 0.1.1 yayıncıyı küçük harfli "proteksistem" yazar.
 PackageIdentifier: Proteksistem.BulutBelge
 PackageVersion: 0.1.1
-InstallerType: nullsoft
-Scope: user
+InstallerType: wix
+Scope: machine
 InstallModes:
 - interactive
 - silent
+- silentWithProgress
 UpgradeBehavior: install
-Commands:
-- bulutbelge
+ElevationRequirement: elevatesSelf
 ReleaseDate: 2026-11-24
-# Program Ekle/Kaldır kaydı (Tauri NSIS şablonu, kullanıcı kapsamı: HKCU\...\Uninstall\BulutBelge).
-# 0.1.1 yayıncıyı kimlikten türetilmiş küçük harfli "proteksistem" olarak yazar; 0.1.2'den itibaren "Proteksistem".
-AppsAndFeaturesEntries:
-- DisplayName: BulutBelge
-  Publisher: proteksistem
-  DisplayVersion: 0.1.1
-  ProductCode: BulutBelge
 InstallationMetadata:
-  DefaultInstallLocation: '%LocalAppData%\BulutBelge'
+  DefaultInstallLocation: '%ProgramFiles%\BulutBelge'
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/bulutbelge/bulutbelge/releases/download/v0.1.1/BulutBelge_0.1.1_x64-setup.exe
-  InstallerSha256: 97A1CC120B122CA497D7A45F1B51682AC9531079E899F92CFA38B31865F3AE50
+  InstallerLocale: tr-TR
+  InstallerUrl: https://github.com/bulutbelge/bulutbelge/releases/download/v0.1.1/BulutBelge_0.1.1_x64_tr-TR.msi
+  InstallerSha256: 0C7E7C76745680FFCB85CFC47A9D66ED3D1143FC165ECCFAAB4C65F205C9785A
+  ProductCode: '{D3948777-5D15-4ABE-B996-C0B4DE8DCEDE}'
+  AppsAndFeaturesEntries:
+  - DisplayName: BulutBelge
+    Publisher: proteksistem
+    DisplayVersion: 0.1.1
+    ProductCode: '{D3948777-5D15-4ABE-B996-C0B4DE8DCEDE}'
+    UpgradeCode: '{E8581453-4A71-5F24-BB39-23441D15335A}'
+- Architecture: x64
+  InstallerLocale: en-US
+  InstallerUrl: https://github.com/bulutbelge/bulutbelge/releases/download/v0.1.1/BulutBelge_0.1.1_x64_en-US.msi
+  InstallerSha256: CBF7D955963A48B14E33B08047AA13663D7DFB02FE8C1FB7923BEA40B98A562B
+  ProductCode: '{4047AA9C-8CD8-4C4A-B50C-DE6BFFF70EF7}'
+  AppsAndFeaturesEntries:
+  - DisplayName: BulutBelge
+    Publisher: proteksistem
+    DisplayVersion: 0.1.1
+    ProductCode: '{4047AA9C-8CD8-4C4A-B50C-DE6BFFF70EF7}'
+    UpgradeCode: '{E8581453-4A71-5F24-BB39-23441D15335A}'
 ManifestType: installer
 ManifestVersion: 1.10.0
