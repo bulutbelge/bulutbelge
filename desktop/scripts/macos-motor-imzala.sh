@@ -15,6 +15,13 @@ IZINLER="$(cd "$(dirname "$0")/.." && pwd)/src-tauri/macos/motor.entitlements"
 ZAMAN=(--timestamp); [ "$KIMLIK" = "-" ] && ZAMAN=(--timestamp=none)
 
 ANA="$KLASOR/bulutbelge-engine"
+# PyInstaller Python.framework'ü sembolik bağlarla kurar; motor klasörü kopyalanırken (build.py, Tauri kaynakları) bağlar
+# gerçek dosyaya dönüşür ve framework yapısı bozulur. Apple bu kopyaların imzasını geçersiz sayar (24 Kasım,
+# notarizasyon: "The signature of the binary is invalid"). Önyükleyici yalnızca _internal/Python'u yükler; framework
+# klasörü fazlalıktır (aynı kitaplığın üç kopyası). Kaldırıldığında motorun OCR, yüz ve QR taraması denendi.
+if [ -f "$KLASOR/_internal/Python" ] && [ -d "$KLASOR/_internal/Python.framework" ]; then
+  rm -rf "$KLASOR/_internal/Python.framework"
+fi
 sayi=0
 while IFS= read -r -d '' f; do
   [ "$f" = "$ANA" ] && continue
