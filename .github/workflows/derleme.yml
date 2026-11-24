@@ -82,6 +82,12 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # macOS Developer ID imzası ve Apple notarizasyonu yalnızca bu gizli değer tanımlıysa çalışır (AKS-089);
+      # tanımlı değilse paket ad-hoc imzayla çıkar (tauri.release.conf.json). Değerler açık depoda asla yer almaz.
+      APPLE_IMZA: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      # Notarizasyon ayrıca App Store Connect API anahtarı ister; yoksa paket Developer ID ile imzalanır, notarize edilmez.
+      APPLE_NOTER: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_API_KEY != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -123,12 +129,56 @@ jobs:
         env:
           BULUTBELGE_TARGET: ${{ matrix.hedef }}
         run: python build.py
+      # Geçici anahtarlık: sertifika yalnızca bu koşunun anahtarlığına girer, iş bitince makine silinir. İmza ve
+      # notarizasyon değişkenleri yalnızca macOS işine ve bu adımdan sonrasına aktarılır ($GITHUB_ENV).
+      - name: macOS imza anahtarlığı ve notarizasyon anahtarı (Developer ID)
+        if: matrix.ad == 'macos' && env.APPLE_IMZA == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          kc="$RUNNER_TEMP/imza.keychain-db"; kp="$(openssl rand -hex 24)"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/sertifika.p12"
+          security create-keychain -p "$kp" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kp" "$kc"
+          security import "$RUNNER_TEMP/sertifika.p12" -k "$kc" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kp" "$kc" > /dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/sertifika.p12"
+          security find-identity -v -p codesigning "$kc" | grep -q "Developer ID Application" || { echo "Developer ID sertifikası bulunamadı"; exit 1; }
+          {
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            echo "TAURI_IMZA_AYARI=--config $RUNNER_TEMP/tauri.imza.conf.json"
+          } >> "$GITHUB_ENV"
+          # Tauri, APPLE_API_* tanımlıysa notarize eder; tanımlı değilse yalnızca imzalar.
+          if [ "$APPLE_NOTER" = "true" ]; then
+            umask 077; printf '%s' "$APPLE_API_PRIVATE_KEY" > "$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+            {
+              echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+              echo "APPLE_API_KEY=$APPLE_API_KEY"
+              echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::warning::App Store Connect API anahtarı tanımlı değil: paket Developer ID ile imzalanır ama notarize edilmez."
+          fi
+          # Yapılandırmadaki ad-hoc kimliğin ("-") yerine Developer ID açıkça verilir (ortam değişkeni önceliğine güvenilmez).
+          python3 -c 'import json,os,sys; json.dump({"bundle":{"macOS":{"signingIdentity":os.environ["APPLE_SIGNING_IDENTITY"]}}}, sys.stdout)' > "$RUNNER_TEMP/tauri.imza.conf.json"
+      # Tauri yalnızca uygulamanın kendi ikilisini imzalar; kaynak olarak eklenen motorun her Mach-O dosyası
+      # sertleştirilmiş çalışma zamanı ve zaman damgasıyla ayrıca imzalanmazsa Apple notarizasyonu reddeder.
+      - name: Motoru imzala (macOS, Developer ID)
+        if: matrix.ad == 'macos' && env.APPLE_IMZA == 'true'
+        run: bash desktop/scripts/macos-motor-imzala.sh "$APPLE_SIGNING_IDENTITY"
       - name: Arayüz bağımlılıkları
         working-directory: desktop
         run: npm ci
       - name: Uygulamayı derle (Tauri)
         working-directory: desktop
-        run: npx tauri build --config src-tauri/tauri.release.conf.json -- --locked
+        run: npx tauri build --config src-tauri/tauri.release.conf.json ${TAURI_IMZA_AYARI:-} -- --locked
       # İMZA (yer tutucu): SignPath onayı gelince açılır. Gizli değişken adları yalnızca burada
       # anılır; değerleri açık depoda asla yer almaz, GitHub › Settings › Secrets and variables altında tutulur.
       # - name: SignPath ile imzala (Windows)
@@ -139,6 +189,30 @@ jobs:
       #     organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
       #     project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
       #     signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+      # macOS: Apple Developer ID yok; tauri.release.conf.json ad-hoc imzayla ("-") paketin tamamını mühürler.
+      # Mühür eksikse karantinalı indirmede macOS "hasar görmüş" der (0.1.0'da yaşandı); bu adım öyle bir paketi durdurur.
+      - name: macOS paket mührünü doğrula
+        if: matrix.ad == 'macos'
+        run: |
+          bundle=desktop/src-tauri/target/release/bundle
+          codesign --verify --deep --strict --verbose=2 "$bundle"/macos/*.app
+          dmg=$(ls "$bundle"/dmg/*.dmg | head -1)
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
+          codesign --verify --deep --strict --verbose=2 "$mnt"/*.app
+          codesign -dv "$mnt"/*.app 2>&1 | grep -q "Sealed Resources"
+          if [ "$APPLE_IMZA" = "true" ]; then
+            # Developer ID ile imzalı, sertleştirilmiş çalışma zamanı açık ve zaman damgalı olmalı.
+            codesign -dv --verbose=4 "$mnt"/*.app 2>&1 | grep -q "Authority=Developer ID Application"
+            codesign -dv --verbose=4 "$mnt"/*.app 2>&1 | grep -q "flags=0x10000(runtime)"
+            codesign -dv --verbose=4 "$mnt"/*.app/Contents/Resources/engine/bulutbelge-engine 2>&1 | grep -q "Authority=Developer ID Application"
+          fi
+          if [ "$APPLE_NOTER" = "true" ]; then
+            # Apple onayı (notarizasyon) uygulamaya zımbalanmış olmalı; Gatekeeper uyarısız açar.
+            xcrun stapler validate "$mnt"/*.app
+            spctl --assess --type execute -vv "$mnt"/*.app 2>&1 | tee /dev/stderr | grep -q "Notarized Developer ID"
+          fi
+          hdiutil detach "$mnt"
       - name: Çıktıları topla
         run: |
           mkdir -p cikti

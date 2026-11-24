@@ -98,3 +98,10 @@ def test_webview2_arka_plan_agi_kapali_bayraklarla_baslar():
     bayraklar = pencere["additionalBrowserArgs"]
     for b in ("msWebOOUI", "msPdfOOUI", "msSmartScreenProtection", "DnsOverHttps", "--disable-background-networking", "--disable-component-update", "--no-pings", "--disable-sync"):
         assert b in bayraklar
+
+
+def test_macos_paketi_ad_hoc_imzayla_muhurlenir():
+    """Apple Developer ID yokken paket ad-hoc ("-") imzayla mühürlenmeli: mühürsüz paket karantinalı indirmede
+    macOS'ta "hasar görmüş" uyarısı verir (0.1.0). Derleme iş akışı mührü ayrıca doğrular."""
+    yapilandirma = json.loads((TAURI / "tauri.release.conf.json").read_text(encoding="utf-8"))
+    assert yapilandirma["bundle"]["macOS"]["signingIdentity"] == "-"

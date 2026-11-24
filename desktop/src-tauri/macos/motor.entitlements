@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Motor (PyInstaller ile paketlenmiş Python) için sertleştirilmiş çalışma zamanı izinleri; notarizasyon sertleştirilmiş
+  çalışma zamanını zorunlu kılar. Python eklentileri ve OpenCV/MuPDF yürütülebilir bellek ister; paket içindeki
+  kitaplıklar motorla aynı kimlikle imzalanır ama PyInstaller önyükleyicisi bunları yol üzerinden yükler. Ağ, kamera,
+  mikrofon gibi izinler YOKTUR: motor ağa çıkmaz.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>

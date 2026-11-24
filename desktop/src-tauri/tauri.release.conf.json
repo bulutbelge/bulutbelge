@@ -6,6 +6,9 @@
       "../../LICENSE": "licenses/LICENSE",
       "../../NOTICE.md": "licenses/NOTICE.md",
       "../../THIRD-PARTY-LICENSES.md": "licenses/THIRD-PARTY-LICENSES.md"
+    },
+    "macOS": {
+      "signingIdentity": "-"
     }
   }
 }
