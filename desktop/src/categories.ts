@@ -16,7 +16,7 @@ export interface Category {
 export const CATEGORIES: Category[] = [
   { key: "isim", label: "İsimler", icon: "user", types: ["kisi_adi", "kurum_unvani"] },
   { key: "kimlik", label: "Kimlik numaraları", icon: "idcard", types: ["tc_kimlik", "vkn", "vergi_dairesi", "pasaport", "ehliyet", "sgk", "mersis", "ticaret_sicil", "sicil_no", "mrz"] },
-  { key: "iletisim", label: "Telefon ve e-posta", icon: "phone", types: ["telefon", "eposta"] },
+  { key: "iletisim", label: "Telefon, e-posta ve web", icon: "phone", types: ["telefon", "eposta", "web_sitesi"] },
   { key: "adres", label: "Adres", icon: "pin", types: ["adres"] },
   { key: "banka", label: "Banka ve kart", icon: "card", types: ["iban", "banka_bilgisi", "kredi_karti"] },
   { key: "tarih", label: "Doğum tarihi", icon: "calendar", types: ["dogum_tarihi"] },
@@ -88,6 +88,7 @@ const SHORT: Record<string, string> = {
   ticaret_sicil: "ticaret sicil",
   telefon: "telefon",
   eposta: "e-posta",
+  web_sitesi: "web sitesi",
   iban: "IBAN",
   banka_bilgisi: "banka",
   kredi_karti: "kart",

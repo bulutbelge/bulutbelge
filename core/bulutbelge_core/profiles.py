@@ -75,6 +75,7 @@ BUILTIN_PURPOSES: tuple[tuple[str, str, dict[str, tuple[bool, str]]], ...] = (
             "banka_bilgisi": (True, "karartma"),
             "telefon": (True, "karartma"),
             "eposta": (True, "etiket"),
+            "web_sitesi": (True, "etiket"),
             "ettn": (True, "karartma"),
             "imza": (True, "karartma"),
             # Fatura dışı genel alanlar kapalı başlar; istenirse kural takımından açılabilir.

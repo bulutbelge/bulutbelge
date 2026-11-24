@@ -10,6 +10,15 @@ UpgradeBehavior: install
 Commands:
 - bulutbelge
 ReleaseDate: 2026-11-24
+# Program Ekle/Kaldır kaydı (Tauri NSIS şablonu, kullanıcı kapsamı: HKCU\...\Uninstall\BulutBelge).
+# 0.1.1 yayıncıyı kimlikten türetilmiş küçük harfli "proteksistem" olarak yazar; 0.1.2'den itibaren "Proteksistem".
+AppsAndFeaturesEntries:
+- DisplayName: BulutBelge
+  Publisher: proteksistem
+  DisplayVersion: 0.1.1
+  ProductCode: BulutBelge
+InstallationMetadata:
+  DefaultInstallLocation: '%LocalAppData%\BulutBelge'
 Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/bulutbelge/bulutbelge/releases/download/v0.1.1/BulutBelge_0.1.1_x64-setup.exe

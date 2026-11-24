@@ -120,6 +120,8 @@ DATA_TYPES: dict[str, DataType] = {
                  default_enabled=False, example="Örnek Bankası / Merkez Şb."),
         DataType("ettn", "ETTN / e-İmza bilgisi", "[ETTN / E-IMZA]", (BLACKOUT, LABEL, PSEUDONYM, BLUR), BLACKOUT,
                  default_enabled=False, example="12345678-1234-1234-1234-1234567890ab"),
+        DataType("web_sitesi", "Web sitesi / alan adı", "[WEB]", (LABEL, BLACKOUT, BLUR), LABEL,
+                 default_enabled=False, example="https://ornek.com.tr"),
         DataType("musteri_no", "Müşteri / poliçe no", "[MUSTERI NO]", (LABEL, KEEP_LAST4, PSEUDONYM, BLACKOUT, BLUR),
                  LABEL, example="MS-2026-004512"),
         DataType("yuz", "Yüz (fotoğraf)", "[YUZ]", (BLUR, BLACKOUT, LABEL), BLUR),

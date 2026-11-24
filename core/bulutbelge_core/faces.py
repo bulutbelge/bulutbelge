@@ -193,14 +193,41 @@ def find_faces(page: pymupdf.Page) -> list[pymupdf.Rect]:
                 nw, nh = fw * shrink, fh * shrink
                 raw_boxes.append((cx - nw / 2.0, cy - nh / 2.0, nw, nh))
 
+    images = _image_boxes(page)
     out = []
     for x, y, w, h in raw_boxes:
         pad_w, pad_h = w * _PAD, h * _PAD * 1.4
         box = pymupdf.Rect(x - pad_w, y - pad_h, x + w + pad_w, y + h + pad_h * 0.8) / zoom
-        b = box & rect
+        b = _clip_to_image(box & rect, images)
         if not b.is_empty:
             out.append(b)
     return _merge(out)
+
+
+def _image_boxes(page: pymupdf.Page) -> list[pymupdf.Rect]:
+    """Sayfadaki gömülü görsellerin sayfa üzerindeki kutuları."""
+    try:
+        infos = page.get_image_info()
+    except Exception:
+        return []
+    return [r for r in (pymupdf.Rect(i["bbox"]) & page.rect for i in infos) if not r.is_empty]
+
+
+def _clip_to_image(box: pymupdf.Rect, images: list[pymupdf.Rect]) -> pymupdf.Rect:
+    """Yüz kutusunu yüzün bulunduğu görselin sınırına kırpar.
+
+    Pay (saç, kulak, çene) görselin dışına taşarsa yanındaki metin katmanı da silinirdi
+    (Windows denemesi 6, D1). Yüz bir görselin içindeyse o görselin dışında yüz pikseli
+    olamaz. Merkezi hiçbir görselde olmayan kutu (vektör çizim) olduğu gibi kalır.
+    """
+    if box.is_empty or not images:
+        return box
+    center = pymupdf.Point((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2)
+    holders = [r for r in images if r.contains(center)]
+    if not holders:
+        return box
+    # Üst üste binen görsellerde en küçüğü (yüzün asıl fotoğrafı) alınır.
+    return box & min(holders, key=lambda r: r.get_area())
 
 
 def _merge(rects: list[pymupdf.Rect]) -> list[pymupdf.Rect]:

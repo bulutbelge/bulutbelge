@@ -18,7 +18,7 @@ export const TYPE_GROUPS: { key: string; label: string; hint: string; icon: Icon
     label: "İletişim ve adres",
     hint: "Kişiye ulaşmayı sağlayan bilgiler",
     icon: "phone",
-    types: ["telefon", "eposta", "adres"],
+    types: ["telefon", "eposta", "web_sitesi", "adres"],
   },
   {
     key: "finans",

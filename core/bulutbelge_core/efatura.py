@@ -645,7 +645,11 @@ def scan_ubl_xml(text: str, rules: Rules, hints: frozenset[str], lead: bool) -> 
                 attr_spans: list[tuple[str, int, int]] = []
                 base = m.start("attrs")
                 for a in _ATTR.finditer(m.group("attrs") or ""):
-                    ak = _local(a.group(1))
+                    raw_name = a.group(1)
+                    if raw_name == "xmlns" or raw_name.startswith("xmlns:"):
+                        # Ad alanı bildirimi veri değildir; değiştirilirse XML'in anlamı bozulur (web adresi bulgusu).
+                        continue
+                    ak = _local(raw_name)
                     grp = "dq" if a.group("dq") is not None else "sq"
                     av_s, av_e = base + a.start(grp), base + a.end(grp)
                     attrs[ak] = a.group(grp)

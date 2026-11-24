@@ -26,6 +26,7 @@
     }
   },
   "bundle": {
+    "publisher": "Proteksistem",
     "active": true,
     "targets": ["msi", "nsis"],
     "license": "AGPL-3.0-only",
@@ -56,6 +57,10 @@
       "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
       "nsis": {
         "installerHooks": "windows/hooks.nsh",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "headerImage": "windows/nsis/baslik.bmp",
+        "sidebarImage": "windows/nsis/yan.bmp",
         "languages": ["Turkish", "English"],
         "displayLanguageSelector": false,
         "customLanguageFiles": {
@@ -68,6 +73,8 @@
           "tr-TR": { "localePath": "windows/wix/tr-TR.wxl" },
           "en-US": {}
         },
+        "bannerPath": "windows/wix/serit.bmp",
+        "dialogImagePath": "windows/wix/diyalog.bmp",
         "fragmentPaths": ["windows/wix/kayit-temizle.wxs"],
         "componentRefs": ["KayitAnahtariTemizle"]
       }

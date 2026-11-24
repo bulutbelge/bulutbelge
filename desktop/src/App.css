@@ -767,6 +767,7 @@ select:disabled {
 .t-kredi_karti { --c: var(--t-kart); }
 .t-telefon { --c: var(--t-tel); }
 .t-eposta { --c: var(--t-mail); }
+.t-web_sitesi { --c: var(--t-mail); }
 .t-imza { --c: var(--t-imza); }
 .t-adres { --c: var(--t-adres); }
 .t-dogum_tarihi { --c: var(--t-dogum); }

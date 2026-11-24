@@ -42,3 +42,31 @@ def test_text_only_pdf_is_not_searched_for_faces(tmp_path):
     doc.save(src)
     doc.close()
     assert not [f for f in scan_pdf(src, Rules.from_dict(None)).findings if f.finding.type == "yuz"]
+
+
+def test_face_box_stays_inside_its_image_and_keeps_nearby_text(tmp_path):
+    # Windows denemesi 6, D1: yüze sıkı kırpılmış fotoğraf metnin hemen altında; pay görselin
+    # dışına taşınca üstteki cümlenin başı da siliniyordu.
+    import io
+
+    buf = io.BytesIO()
+    draw_face(200).crop((90, 40, 310, 330)).save(buf, "PNG")
+    src = tmp_path / "basvuru.pdf"
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "SAHTE BASVURU FORMU", fontsize=14)
+    page.insert_text((72, 95), "Bu belge tamamen sahtedir ve gercek kisi icermez.", fontsize=10)
+    image_rect = pymupdf.Rect(72, 99, 182, 244)
+    page.insert_image(image_rect, stream=buf.getvalue())
+    doc.save(src)
+    doc.close()
+
+    rules = Rules.from_dict(None)
+    faces = [f for f in scan_pdf(src, rules).findings if f.finding.type == "yuz"]
+    assert len(faces) == 1
+    assert image_rect.contains(faces[0].rects[0])
+
+    out = mask_pdf(src, tmp_path / "out.pdf", rules)
+    text = pymupdf.open(out.target)[0].get_text()
+    assert "Bu belge tamamen sahtedir ve gercek kisi icermez." in text
+    assert "SAHTE BASVURU FORMU" in text

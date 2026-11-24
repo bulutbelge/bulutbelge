@@ -44,7 +44,15 @@ _IBAN = re.compile(r"\bTR(?:[ ]?\d){24}(?!\d)", re.IGNORECASE)
 _CARD = re.compile(r"(?<![A-Za-z0-9])\d(?:[ -]?\d){12,18}(?![A-Za-z0-9])")
 _PHONE = re.compile(
     r"(?<![\d+])(?:(?:\+90|0090)[ -]?|0)?\(?5\d{2}\)?[ -]?\d{3}[ -]?\d{2}[ -]?\d{2}(?!\d)"
-    r"|(?<![\d+])(?:(?:\+90|0090)[ -]?|0)\(?[2-4]\d{2}\)?[ -]?\d{3}[ -]?\d{2}[ -]?\d{2}(?!\d)"
+    # Sabit hat ve özel numaralar (0212..., 0850, 0800): alan kodu 2-4 ya da 8 ile başlar.
+    r"|(?<![\d+])(?:(?:\+90|0090)[ -]?|0)\(?[2-48]\d{2}\)?[ -]?\d{3}[ -]?\d{2}[ -]?\d{2}(?!\d)"
+    # "+" olmadan "90" ile yazılmış cep numarası (905xx...).
+    r"|(?<![\d+])90[ -]?\(?5\d{2}\)?[ -]?\d{3}[ -]?\d{2}[ -]?\d{2}(?!\d)"
+)
+# "+" olmadan "90" ile yazılmış sabit hat yalnızca telefon etiketinden sonra (başka 12 haneli numaralarla karışmasın).
+_PHONE_90_LABELED = re.compile(
+    r"(?i)(?<![\w])(?:tel(?:efon)?|gsm|cep|faks|fax)\.?(?:\s*(?:no|numaras[ıi])\.?)?\s*[:.]?\s*"
+    r"(90[ -]?\(?[2-48]\d{2}\)?[ -]?\d{3}[ -]?\d{2}[ -]?\d{2})(?!\d)"
 )
 # Gruplanmış 16 hane: kart numarası gibi yazılmış ama Luhn tutmuyor.
 _CARD_GROUPED = re.compile(r"(?<![A-Za-z0-9])\d{4}([ -])\d{4}\1\d{4}\1\d{4}(?![A-Za-z0-9])")
@@ -89,6 +97,7 @@ _PRIORITY = {
     "kullanici_adi": 27,
     "unvan_kurum": 28,
     "musteri_no": 29,
+    "web_sitesi": 29,
     "kisi_adi": 30,
 }
 
@@ -113,6 +122,7 @@ _EXTRA = (
     ("unvan_kurum", xt.find_title_institution, MEDIUM),
     ("mersis", ids.find_mersis, HIGH),
     ("musteri_no", ids.find_customer_numbers, MEDIUM),
+    ("web_sitesi", xt.find_websites, HIGH),
 )
 
 
@@ -170,6 +180,8 @@ def detect(
     if enabled("telefon"):
         for m in _PHONE.finditer(text):
             candidates.append(Finding("telefon", m.start(), m.end(), m.group(), HIGH))
+        for m in _PHONE_90_LABELED.finditer(text):
+            candidates.append(Finding("telefon", m.start(1), m.end(1), m.group(1), HIGH))
 
     # Karışık yazımlar (aralıklı/tam genişlikli rakam, OCR harfi, bölünmüş IBAN); doğrulayıcılı.
     for kind, start, end, confidence in find_mixed(

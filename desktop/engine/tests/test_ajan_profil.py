@@ -125,3 +125,19 @@ def test_missing_custom_pattern_is_looser():
     ceiling["patterns"] = [{"name": "Dosya no", "pattern": r"DSY-\d{4}"}]
     assert settings.looser_than(base, ceiling) == ["1 özel kalıp yok"]
     assert settings.looser_than(ceiling, base) == []
+
+
+def test_silinmis_izinli_klasor_kaydi_kilitlemez(tmp_path):
+    # Önceden izin verilmiş iki klasör sonradan silindi: biri kaldırılırken diğeri kaydı
+    # "Klasör bulunamadı" ile durduruyordu; yeni klasör de eklenemiyordu.
+    eski1, eski2, yeni = tmp_path / "eski1", tmp_path / "eski2", tmp_path / "yeni"
+    for k in (eski1, eski2, yeni):
+        k.mkdir()
+    settings.save_agent({"folders": [str(eski1), str(eski2)]})
+    eski1.rmdir()
+    eski2.rmdir()
+    out = settings.save_agent({"folders": [str(eski2), str(yeni)]})
+    assert out["folders"] == [str(yeni.resolve())]
+    # Daha önce kaydedilmemiş, var olmayan klasör hâlâ reddedilir.
+    with pytest.raises(settings.EngineError):
+        settings.save_agent({"folders": [str(tmp_path / "hic-olmadi")]})

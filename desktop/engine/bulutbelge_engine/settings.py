@@ -809,7 +809,12 @@ def save_agent(params: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, list):
         raise EngineError("invalid_settings", "'folders' liste olmalı")
     folders: list[str] = []
+    saved = set(load_agent()["folders"])
     for f in raw:
+        if isinstance(f, str) and f.strip() in saved and not Path(f.strip()).exists():
+            # Daha önce izin verilmiş ama sonradan silinmiş klasör listeden düşer. Yoksa her kayıt
+            # "Klasör bulunamadı" ile durur ve ne o klasör kaldırılabilir ne yenisi eklenebilir (24 Kasım).
+            continue
         c = _clean_folder(f)
         if c not in folders:
             folders.append(c)

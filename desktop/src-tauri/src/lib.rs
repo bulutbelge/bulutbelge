@@ -1,5 +1,6 @@
 mod engine;
 mod guncelleme;
+mod guvenli_dns;
 
 use engine::Engine;
 use serde_json::Value;
@@ -34,6 +35,10 @@ pub fn run() {
     let gezinme = tauri::plugin::Builder::<tauri::Wry>::new("gezinme")
         .on_navigation(|_webview, url| uygulama_adresi_mi(url))
         .build();
+    let context = tauri::generate_context!();
+    // WebView2 başlamadan: uygulamanın kendi WebView2 profilinde şifreli DNS (DoH) yükseltmesi kapalı (W.1).
+    #[cfg(windows)]
+    guvenli_dns::webview_guvenli_dns_kapat(&context.config().identifier);
     tauri::Builder::default()
         .plugin(gezinme)
         .plugin(tauri_plugin_dialog::init())
@@ -45,6 +50,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![engine_call, guncelleme::guncelleme_denetle])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("uygulama başlatılamadı");
 }

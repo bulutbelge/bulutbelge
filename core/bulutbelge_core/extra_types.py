@@ -473,6 +473,36 @@ def find_social_handles(text: str) -> Iterator[tuple[int, int]]:
                 yield span
 
 
+# ---------- Web sitesi / alan adı ----------
+# 1) "http(s)://..." ya da "www." ile başlayan adresler,
+# 2) "Web sitesi:", "Web:", "İnternet adresi:", "URL:" etiketinden sonra yazılan çıplak alan adı ("ornek.com.tr").
+# E-posta adresinin alan adı eşleşmez (önündeki "@" ya da yerel kısım). Sondaki nokta, virgül, parantez alınmaz.
+_WEB_HOST = r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24}"
+_WEB_PATH = r"(?::\d{2,5})?(?:/[^\s<>\"'“”]*)?"
+_WEB_URL = re.compile(r"(?i)(?<![\w@.\-/])(?:https?://|www\.)" + _WEB_HOST + _WEB_PATH)
+_WEB_SCHEME_ONLY = re.compile(r"(?i)(?<![\w@.\-/])https?://[^\s<>\"'“”]+")
+_WEB_LABEL = re.compile(
+    r"(?i)(?<![\w])(?:web(?:\s*sitesi|\s*site|\s*adresi)?|internet\s*(?:sitesi|adresi)|url)\s*[:=]\s*"
+    r"(" + _WEB_HOST + _WEB_PATH + r")"
+)
+_WEB_TRAIL = ".,;:!?)]}’'\""
+
+
+def find_websites(text: str) -> Iterator[tuple[int, int]]:
+    seen: list[tuple[int, int]] = []
+    for pat, grp in ((_WEB_SCHEME_ONLY, 0), (_WEB_URL, 0), (_WEB_LABEL, 1)):
+        for m in pat.finditer(text):
+            s, e = m.start(grp), m.end(grp)
+            while e > s and text[e - 1] in _WEB_TRAIL:
+                e -= 1
+            if e - s < 4 or "@" in text[s:e]:
+                continue
+            if any(a <= s and e <= b for a, b in seen):
+                continue
+            seen.append((s, e))
+            yield s, e
+
+
 # ---------- Unvan + kurum ----------
 # "Ankara İl Sağlık Müdürü", "Örnek Yazılım A.Ş. Genel Müdürü": kurum adı ve unvan birlikte kişiyi dolaylı
 # tanımlar (makam tek kişidir). Eşleşme kurum adı (büyük harfle başlayan 1-6 sözcük) + unvan sözcüğüdür;

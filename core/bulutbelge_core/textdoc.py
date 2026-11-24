@@ -47,7 +47,7 @@ _TOKEN = re.compile(
     r"|(?P<tag><[A-Za-z_:/][^<>\"']*(?:(?:\"[^\"]*\"|'[^']*')[^<>\"']*)*>)",
     re.DOTALL,
 )
-_ATTR_VALUE = re.compile(r"=\s*(?:\"(?P<dq>[^\"]*)\"|'(?P<sq>[^']*)')")
+_ATTR_VALUE = re.compile(r"(?P<name>[A-Za-z_][\w.:-]*)\s*=\s*(?:\"(?P<dq>[^\"]*)\"|'(?P<sq>[^']*)')")
 _DOCTYPE = re.compile(r"<!DOCTYPE", re.IGNORECASE)
 _XML_ENCODING = re.compile(rb"^\s*<\?xml[^>]*encoding\s*=\s*[\"']([A-Za-z0-9._-]+)[\"']")
 _CHAR_REF = re.compile(r"&#[0-9xX]")
@@ -122,6 +122,8 @@ def _content_spans(text: str, fmt: str) -> list[tuple[int, int]]:
         elif m.group("tag") is not None:
             base = m.start()
             for a in _ATTR_VALUE.finditer(m.group("tag")):
+                if a.group("name") == "xmlns" or a.group("name").startswith("xmlns:"):
+                    continue  # ad alanı bildirimi veri değildir; değişirse XML'in anlamı bozulur
                 group = "dq" if a.group("dq") is not None else "sq"
                 s, e = a.span(group)
                 spans.append((base + s, base + e))
