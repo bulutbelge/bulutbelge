@@ -31,3 +31,6 @@ LangString deleteAppData ${LANG_ENGLISH} "Delete the application data"
 ; W.5: welcome and licence page texts (used by MUI_*_TEXT defines in windows/hooks.nsh)
 LangString bbKarsilama ${LANG_ENGLISH} "Setup will guide you through the installation of $(^NameDA).$\r$\n$\r$\nIt is recommended that you close all other applications before starting Setup. This will make it possible to update relevant system files without having to reboot your computer.$\r$\n$\r$\n$_CLICK"
 LangString bbLisansAlt ${LANG_ENGLISH} "If you accept the terms, click 'I Agree'. You must accept the terms to install $(^NameDA)."
+
+; Where the app data stays after uninstalling (windows/hooks.nsh, NSIS_HOOK_POSTUNINSTALL)
+LangString bbVeriKaldi ${LANG_ENGLISH} "Your settings and activity log remain in the $APPDATA\com.proteksistem.bulutbelge folder. You can delete this folder yourself if you no longer need it."

@@ -27,6 +27,35 @@ def test_person_names(text, name):
     assert ("kisi_adi", name) in found(text)
 
 
+# Geri bildirim (24 Kasım, macOS denemesi): dört sözcüklü adın (ad, ikinci ad, iki soyad) dördüncü sözcüğü
+# etiketsiz metinde açıkta kalıyordu. Adlar sahtedir.
+@pytest.mark.parametrize(
+    "text, name",
+    [
+        ("Fakültemiz öğrencisi Ayşe Nur Yılmaz Demir öğrenimine devam etmektedir.", "Ayşe Nur Yılmaz Demir"),
+        ("Fakültemiz öğrencisi AYŞE NUR YILMAZ DEMİR öğrenimine devam etmektedir.", "AYŞE NUR YILMAZ DEMİR"),
+        ("Belgeyi Zeynep Kaya Aksoy imzaladı.", "Zeynep Kaya Aksoy"),
+        ("Ayşe Nur Yılmaz Aydın", "Ayşe Nur Yılmaz Aydın"),
+        ("Adı Soyadı: Ayşe Nur Yılmaz Demir", "Ayşe Nur Yılmaz Demir"),
+    ],
+)
+def test_dort_sozcuklu_ad_tamamen_bulunur(text, name):
+    assert ("kisi_adi", name) in found(text)
+
+
+@pytest.mark.parametrize(
+    "text, name",
+    [
+        ("Ayşe Yılmaz Telefon: 0532 000 12 34", "Ayşe Yılmaz"),  # alan adı soyad sayılmaz
+        ("Mehmet Ali Kaya Bey geldi.", "Mehmet Ali Kaya"),  # unvan soyad sayılmaz
+        ("AYŞE NUR YILMAZ Demir Sanayi", "AYŞE NUR YILMAZ"),  # yazımı farklı sözcük katılmaz
+        ("Ayşe Yılmaz\nDemir", "Ayşe Yılmaz"),  # alt satır katılmaz
+    ],
+)
+def test_ikinci_soyad_yalnizca_ayni_satirda_ve_ayni_yazimla(text, name):
+    assert ("kisi_adi", name) in found(text)
+
+
 @pytest.mark.parametrize(
     "text",
     ["Deniz Bank şubesi", "Fatih Sultan Mehmet Bulvarı", "Umut verici bir gelişme", "İşveren: Örnek Bilişim A.Ş.", "Ali Bey"],

@@ -59,6 +59,31 @@ def test_kurulum_metinleri_w5():
     rtf = (TAURI / "windows" / "KOSULLAR.rtf").read_bytes().decode("ascii")
     assert "Before you start (English)" in rtf and rtf.rstrip().endswith("}")
 
+
+def test_nsis_turkce_mui_hatalari_dil_dosyasinda_duzeltilir():
+    """24 Kasım ekran kontrolü: NSIS'in Türkçe MUI dosyasındaki "bilgisayariniza" (çift boşluklu),
+    "Litfen", "Tamamlandır", "Programi" metinleri kendi dil dosyamızda aynı adla yeniden tanımlanır.
+    Kaldırma iletisi de kurulum dilinde (LangString) gösterilir."""
+    tr = (TAURI / "windows" / "nsis" / "Turkish.nsh").read_text(encoding="utf-8")
+    for ad in (
+        "MUI_TEXT_FINISH_INFO_TEXT",
+        "MUI_TEXT_FINISH_INFO_REBOOT",
+        "MUI_UNTEXT_UNINSTALLING_SUBTITLE",
+        "MUI_UNTEXT_FINISH_TITLE",
+        "MUI_UNTEXT_ABORTWARNING",
+    ):
+        assert f"LangString {ad} ${{LANG_TURKISH}} " in tr, ad
+    for hatali in ("bilgisayariniza", "Litfen", "Tamamlandır\"", "Programi ", "  bilgisayar", "gerekiyor.B"):
+        assert hatali not in tr, hatali
+    kanca = (TAURI / "windows" / "hooks.nsh").read_text(encoding="utf-8")
+    kaldirma = kanca.split("!macro NSIS_HOOK_POSTUNINSTALL", 1)[1]
+    assert 'MessageBox MB_OK|MB_ICONINFORMATION "$(bbVeriKaldi)"' in kaldirma
+    assert "Ayarlarınız" not in kanca
+    for dil, sabit in (("Turkish", "LANG_TURKISH"), ("English", "LANG_ENGLISH")):
+        metin = (TAURI / "windows" / "nsis" / f"{dil}.nsh").read_text(encoding="utf-8")
+        assert f"LangString bbVeriKaldi ${{{sabit}}} " in metin, dil
+        assert "$APPDATA\\com.proteksistem.bulutbelge" in metin, dil
+
 def test_cevrimdisi_yapilandirma_yalnizca_webview_modu():
     cfg = _json("tauri.offline.conf.json")
     assert cfg["bundle"] == {"windows": {"webviewInstallMode": {"type": "offlineInstaller"}}}

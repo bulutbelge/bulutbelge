@@ -5,7 +5,8 @@
 1. **Etiketli** (yüksek güven): "Ad Soyad:", "Adı Soyadı:", "Sayın", "Kiracı:",
    "Hasta:" gibi bir etiketin ardından büyük harfle başlayan 2-4 sözcük.
 2. **Sözlükten** (orta güven): yaygın Türkçe adlardan biri (+ isteğe bağlı ikinci
-   ad) ve ardından büyük harfle başlayan bir soyad. Tek başına ad ("Deniz",
+   ad) ve ardından büyük harfle başlayan bir soyad (+ aynı satırda, aynı yazımla
+   gelen isteğe bağlı ikinci soyad). Tek başına ad ("Deniz",
    "Umut") yakalanmaz; gündelik sözcüklerle karışır.
 
 Şirket ve kurum adları ("Deniz Bank", "Örnek Bilişim A.Ş.") soyad sanılmasın
@@ -229,6 +230,25 @@ def _trim(text: str, start: int, end: int) -> tuple[int, int] | None:
     return start + kept[0].start(), start + kept[-1].end()
 
 
+def _second_surname(text: str, words: list[re.Match[str]], k: int) -> bool:
+    """words[k], words[k-1]'deki soyaddan sonra gelen ikinci soyad mı."""
+    prev, cand = words[k - 1], words[k]
+    word = cand.group()
+    if not (_adjacent(text, prev, cand) and _CAP.fullmatch(word) and word.isupper() == prev.group().isupper()):
+        return False
+    low = word.casefold()
+    if not _ok_surname(word) or low in _FIELD_WORDS or low in _PLACE_WORDS or fold(word) in _HEADING_WORDS:
+        return False
+    after = words[k + 1] if k + 1 < len(words) else None
+    if after is not None and _adjacent(text, cand, after):
+        # "Ayşe Yılmaz Demir Sokak": sokak adı; "Ayşe Yılmaz Mehmet Demir": ikinci kişi.
+        if after.group().casefold() in _PLACE_WORDS:
+            return False
+        if _is_first(word) and _CAP.fullmatch(after.group()):
+            return False
+    return True
+
+
 def find_person_names(text: str) -> Iterator[tuple[int, int, bool]]:
     """(başlangıç, bitiş, etiketli_mi) üretir."""
     for m in _LABEL.finditer(text):
@@ -268,6 +288,11 @@ def find_person_names(text: str) -> Iterator[tuple[int, int, bool]]:
             and _ok_surname(last.group())
             and last.group().casefold() not in _FIELD_WORDS
         ):
+            # İkinci soyad ("Ayşe Nur Yılmaz Demir", "AYŞE YILMAZ DEMİR"): soyaddan sonra aynı satırda aynı
+            # yazımla gelen bir sözcük daha. Yeni bir kişinin adıysa ("Ayşe Yılmaz Mehmet Demir") katılmaz.
+            if j + 1 < len(words) and _second_surname(text, words, j + 1):
+                j += 1
+                last = words[j]
             yield w.start(), last.end(), False
             i = j + 1
         else:
