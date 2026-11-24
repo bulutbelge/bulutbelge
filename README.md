@@ -259,7 +259,7 @@ BulutBelge yardımcı bir araçtır ve %100 doğrulukta çalışmayabilir. Bazı
 
 GNU Affero Genel Kamu Lisansı sürüm 3 ([AGPL-3.0](LICENSE)). Üçüncü taraf bileşenlerin lisansları [NOTICE.md](NOTICE.md) içindedir.
 
----
+----
 
 ## English summary
 
