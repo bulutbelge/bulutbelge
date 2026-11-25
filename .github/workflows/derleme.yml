@@ -1,5 +1,5 @@
 # Açık depo sürüm derlemesi. Bitbucket'taki bitbucket-pipelines.yml derleme adımları (1.87) örnek alındı.
-# v* etiketinde ve elle çalışır: önce testler, sonra Windows (MSI, NSIS), macOS (dmg), Linux (deb, AppImage),
+# v* etiketinde ve elle çalışır: önce testler, sonra Windows (MSI, NSIS), macOS (dmg; Apple Silicon ve Intel), Linux (deb, AppImage),
 # her platform için yerel MCP sunucusunun MCPB paketi (.mcpb, resmî MCP kaydı ve Smithery için; mcp-kayit.yml),
 # en sonda SHA256SUMS ve taslak Release. İmzasız derlemedir; imza adımı için aşağıdaki SignPath yer tutucusuna bakın.
 # Eylemler commit SHA'sı ile sabitlenir; sürüm yorumu yanındadır. Güncellerken SHA'yı etiketten yeniden çözün.
@@ -68,8 +68,11 @@ jobs:
         run: |
           win='{"ad":"windows","calistirici":"windows-latest","hedef":"x86_64-pc-windows-msvc","ek_kilit":"requirements-windows.lock","paketler":"msi nsis","mcpb":"windows-x64"}'
           mac='{"ad":"macos","calistirici":"macos-latest","hedef":"aarch64-apple-darwin","ek_kilit":"requirements-macos.lock","paketler":"dmg","mcpb":"macos-arm64"}'
+          # Intel Mac: bazı bağımlılıkların Intel tekerleği yok, motor ortamı macos_intel_derle.py ile kurulur.
+          # MCPB paketi şimdilik yalnızca Apple Silicon için (resmî kayıtta tek macOS paketi var).
+          mac_intel='{"ad":"macos-intel","calistirici":"macos-15-intel","hedef":"x86_64-apple-darwin","ek_kilit":"requirements-macos.lock","paketler":"dmg","mcpb":"","intel":true}'
           lin='{"ad":"linux","calistirici":"ubuntu-22.04","hedef":"x86_64-unknown-linux-gnu","ek_kilit":"","paketler":"deb appimage","mcpb":"linux-x64"}'
-          if [ "$MACOS" = "true" ]; then liste="[$win,$mac,$lin]"; else liste="[$win,$lin]"; fi
+          if [ "$MACOS" = "true" ]; then liste="[$win,$mac,$mac_intel,$lin]"; else liste="[$win,$lin]"; fi
           echo "include=$liste" >> "$GITHUB_OUTPUT"
 
   derle:
@@ -109,13 +112,35 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
             patchelf libglib2.0-0 binutils fonts-dejavu-core
+      # Intel Mac: pymupdf ve cryptography kaynaktan derlenir (özetleri doğrulanmış arşivlerden); sonra önbellekten gelir.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: matrix.intel
+        with:
+          path: ~/.cache/bb-intel
+          key: intel-${{ matrix.hedef }}-${{ hashFiles('desktop/engine/requirements.lock', 'desktop/engine/macos_intel_derle.py') }}
       - name: Motor bağımlılıkları (hash'li kilit)
+        env:
+          INTEL: ${{ matrix.intel && 'true' || 'false' }}
         run: |
           # Ek kilit aynı pip çağrısında verilir: --require-hashes her bağımlılığın aynı anda sabit olmasını ister
           ek=""; if [ -n "${{ matrix.ek_kilit }}" ]; then ek="-r desktop/engine/${{ matrix.ek_kilit }}"; fi
-          python -m pip install --no-cache-dir --require-hashes -r desktop/engine/requirements.lock $ek
+          if [ "$INTEL" = "true" ]; then
+            python desktop/engine/macos_intel_derle.py --onbellek ~/.cache/bb-intel --kilit-yaz "$RUNNER_TEMP/kalan.lock"
+            python -m pip install --no-cache-dir --require-hashes -r "$RUNNER_TEMP/kalan.lock" $ek
+            python desktop/engine/macos_intel_derle.py --onbellek ~/.cache/bb-intel --kur
+          else
+            python -m pip install --no-cache-dir --require-hashes -r desktop/engine/requirements.lock $ek
+          fi
           python -m pip install --no-cache-dir --no-deps --no-build-isolation ./core ./desktop/engine
-          python -m pip check
+          if [ "$INTEL" = "true" ]; then
+            # Intel'de çekirdek pymupdf "pymupdf-lite" adıyla kurulur (aynı modül); pip check bunu eksik sayar.
+            out=$(python -m pip check || true); echo "$out"
+            kalan=$(echo "$out" | grep -v -E "requires pymupdf, which is not installed|^No broken requirements" || true)
+            [ -z "$kalan" ] || { echo "Beklenmeyen bağımlılık sorunu"; exit 1; }
+            python -c "import pymupdf, cryptography"
+          else
+            python -m pip check
+          fi
       # OpenCV FFmpeg'siz derlenir (GPL kodekleri pakete girmesin); ilk koşu uzun sürer, sonra önbellekten gelir.
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -133,7 +158,7 @@ jobs:
       # Geçici anahtarlık: sertifika yalnızca bu koşunun anahtarlığına girer, iş bitince makine silinir. İmza ve
       # notarizasyon değişkenleri yalnızca macOS işine ve bu adımdan sonrasına aktarılır ($GITHUB_ENV).
       - name: macOS imza anahtarlığı ve notarizasyon anahtarı (Developer ID)
-        if: matrix.ad == 'macos' && env.APPLE_IMZA == 'true'
+        if: startsWith(matrix.ad, 'macos') && env.APPLE_IMZA == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -172,7 +197,7 @@ jobs:
       # Tauri yalnızca uygulamanın kendi ikilisini imzalar; kaynak olarak eklenen motorun her Mach-O dosyası
       # sertleştirilmiş çalışma zamanı ve zaman damgasıyla ayrıca imzalanmazsa Apple notarizasyonu reddeder.
       - name: Motoru imzala (macOS, Developer ID)
-        if: matrix.ad == 'macos' && env.APPLE_IMZA == 'true'
+        if: startsWith(matrix.ad, 'macos') && env.APPLE_IMZA == 'true'
         run: bash desktop/scripts/macos-motor-imzala.sh "$APPLE_SIGNING_IDENTITY"
       - name: Arayüz bağımlılıkları
         working-directory: desktop
@@ -193,7 +218,7 @@ jobs:
       # macOS: Apple Developer ID yok; tauri.release.conf.json ad-hoc imzayla ("-") paketin tamamını mühürler.
       # Mühür eksikse karantinalı indirmede macOS "hasar görmüş" der (0.1.0'da yaşandı); bu adım öyle bir paketi durdurur.
       - name: macOS paket mührünü doğrula
-        if: matrix.ad == 'macos'
+        if: startsWith(matrix.ad, 'macos')
         run: |
           bundle=desktop/src-tauri/target/release/bundle
           codesign --verify --deep --strict --verbose=2 "$bundle"/macos/*.app
@@ -226,6 +251,7 @@ jobs:
       # Betik motoru `mcp` olarak çalıştırıp araç listesini alır, paketi açıp yeniden dener; etikette sürüm
       # etiketle aynı olmalıdır. Manifest, MCPB'nin resmî doğrulayıcısıyla (sabit sürüm) ayrıca denetlenir.
       - name: MCPB paketi (yerel MCP sunucusu)
+        if: matrix.mcpb != ''
         run: |
           surum=""; if [ "$GITHUB_REF_TYPE" = "tag" ]; then surum="--surum ${GITHUB_REF_NAME#v}"; fi
           mkdir -p "$RUNNER_TEMP/mcpb"
