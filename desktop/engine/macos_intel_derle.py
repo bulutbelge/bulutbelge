@@ -57,6 +57,10 @@ OPENSSL = (
     "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
     "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a",
 )
+# `no-module`: eski (legacy) sağlayıcı ayrı yüklenen modül yerine libcrypto'nun içine derlenir. Modül olarak
+# kalınca pakette bulunmadığı için cryptography her açılışta "legacy provider failed to load" uyarısı yazıyordu
+# (Intel deneme derlemesi 45581947363).
+OPENSSL_AYAR = ("darwin64-x86_64-cc", "no-shared", "no-module", "no-tests", "no-docs")
 
 
 def kilit_bloklari(metin: str) -> list[tuple[str, str, str]]:
@@ -128,7 +132,8 @@ def tekerlek_derle(kaynak: Path, klasor: Path, env: dict[str, str]) -> None:
 
 def openssl_derle(onbellek: Path) -> Path:
     surum, url, ozet = OPENSSL
-    onek = onbellek / f"openssl-{surum}-{HEDEF_MACOS}"
+    ayar = hashlib.sha256(" ".join(OPENSSL_AYAR).encode()).hexdigest()[:8]
+    onek = onbellek / f"openssl-{surum}-{HEDEF_MACOS}-{ayar}"
     if (onek / "lib" / "libcrypto.a").is_file():
         return onek
     is_klasoru = onbellek / "is-openssl"
@@ -137,8 +142,7 @@ def openssl_derle(onbellek: Path) -> Path:
     env = ortam()
     print(f"OpenSSL {surum} kaynaktan derleniyor (durağan, macOS {HEDEF_MACOS})", flush=True)
     subprocess.run(
-        ["./Configure", "darwin64-x86_64-cc", "no-shared", "no-tests", "no-docs",
-         f"--prefix={onek}", f"--openssldir={onek}/ssl", "--libdir=lib"],
+        ["./Configure", *OPENSSL_AYAR, f"--prefix={onek}", f"--openssldir={onek}/ssl", "--libdir=lib"],
         cwd=kaynak, env=env, check=True,
     )
     subprocess.run(["make", f"-j{os.cpu_count() or 2}"], cwd=kaynak, env=env, check=True)
@@ -152,7 +156,7 @@ def derle(onbellek: Path) -> Path:
     pm_surum, pm_ozet = surum_ve_ozetler(metin, "pymupdf")
     cr_surum, cr_ozet = surum_ve_ozetler(metin, "cryptography")
     anahtar = hashlib.sha256(
-        json.dumps([pm_surum, cr_surum, MUPDF, OPENSSL, HEDEF_MACOS]).encode()
+        json.dumps([pm_surum, cr_surum, MUPDF, OPENSSL, OPENSSL_AYAR, HEDEF_MACOS]).encode()
     ).hexdigest()[:12]
     klasor = onbellek / f"tekerlek-{anahtar}"
     klasor.mkdir(parents=True, exist_ok=True)
@@ -177,18 +181,21 @@ def derle(onbellek: Path) -> Path:
 
 
 DOGRULA = r"""
-import pathlib, subprocess, sys
-import pymupdf
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+import subprocess, warnings
+# İlk cryptography içe aktarımı burada: OpenSSL sağlayıcı uyarısı ("legacy provider failed to load") hata sayılır.
+with warnings.catch_warnings():
+    warnings.simplefilter("error")
+    import cryptography.hazmat.bindings._rust as r
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 anahtar = AESGCM.generate_key(bit_length=256)
 assert AESGCM(anahtar).decrypt(b"0" * 12, AESGCM(anahtar).encrypt(b"0" * 12, b"deneme", None), None) == b"deneme"
+bag = subprocess.run(["otool", "-L", r.__file__], capture_output=True, text=True, check=True).stdout
+assert "libssl." not in bag and "libcrypto." not in bag, "cryptography sistemdeki OpenSSL'e bağlı: " + bag
+import pymupdf
 belge = pymupdf.open()
 belge.new_page().insert_text((50, 50), "Deneme")
 assert "Deneme" in belge[0].get_text()
 assert hasattr(pymupdf.Page, "get_textpage_ocr")
-import cryptography.hazmat.bindings._rust as r
-bag = subprocess.run(["otool", "-L", r.__file__], capture_output=True, text=True, check=True).stdout
-assert "libssl" not in bag and "libcrypto" not in bag, "cryptography sistemdeki OpenSSL'e bağlı: " + bag
 print("pymupdf", pymupdf.VersionBind, "MuPDF", pymupdf.mupdf_version, "| cryptography tamam")
 """
 
