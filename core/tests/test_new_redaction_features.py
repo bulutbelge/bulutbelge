@@ -1,5 +1,6 @@
 """Yeni eklenen belge, görsel, sayfa aralığı, Excel ve muafiyet kodu özelliklerinin testleri."""
 
+import dataclasses
 from pathlib import Path
 
 import cv2
@@ -249,3 +250,40 @@ def test_excel_unhide_flatten_formulas_and_strip_comments(tmp_path):
     assert (out_wb["Ana"]["A1"].comment is None) or (out_wb["Ana"]["A1"].comment.text == "")
     everything = office.all_text(Path(target).read_bytes())
     assert IBAN not in everything
+
+
+def _qr_pdf(tmp_path: Path, text: str) -> Path:
+    """Sahte QR görseli (OpenCV ile üretilen, gömülü görsel) ve verilen metinli tek sayfalık PDF."""
+    qr = cv2.QRCodeEncoder.create().encode("SAHTE-BELGE:ornek-0000")
+    qr = cv2.resize(qr, (qr.shape[1] * 10, qr.shape[0] * 10), interpolation=cv2.INTER_NEAREST)
+    png = tmp_path / "qr.png"
+    cv2.imwrite(str(png), qr)
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((60, 80), text, fontsize=12)
+    page.insert_image(pymupdf.Rect(340, 130, 520, 310), filename=str(png))
+    out = tmp_path / "qr.pdf"
+    doc.save(out)
+    return out
+
+
+def test_qr_gorseli_etn_acikken_ikinci_kez_imza_sayilmaz(tmp_path):
+    # Windows denemesi 6 D1: ETTN türü açıkken e-Fatura görsel araması e-Fatura olmayan belgede de çalışıyor
+    # ve QR/barkod olarak bulunan kare QR görselini ayrıca "İmza ve kaşe" (e-Fatura QR) sayıyordu.
+    src = _qr_pdf(tmp_path, "ORNEK BASVURU FORMU (SAHTE VERI)")
+    rules = Rules.default()
+    rules.types["ettn"] = dataclasses.replace(rules.types["ettn"], enabled=True)
+    types = [f.finding.type for f in scan_pdf(src, rules).findings]
+    assert types.count("barkod_qr") == 1
+    assert "imza" not in types
+
+
+def test_qr_turu_kapaliyken_efatura_qr_imza_olarak_kalir(tmp_path):
+    # QR/barkod türü kapalıysa e-Fatura QR'ı eskisi gibi "imza" bulgusu olarak maskelenir.
+    src = _qr_pdf(tmp_path, "e-Fatura ETTN: SAHTE")
+    rules = Rules.default()
+    rules.types["ettn"] = dataclasses.replace(rules.types["ettn"], enabled=True)
+    rules.types["barkod_qr"] = dataclasses.replace(rules.types["barkod_qr"], enabled=False)
+    types = [f.finding.type for f in scan_pdf(src, rules).findings]
+    assert types.count("imza") == 1
+    assert "barkod_qr" not in types

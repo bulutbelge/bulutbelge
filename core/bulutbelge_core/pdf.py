@@ -474,8 +474,15 @@ def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image
         if not image and page.get_images() and (signatures_on or rules.types["kurum_unvani"].enabled):
             from .efatura import find_efatura_visuals
 
+            # QR/barkod olarak zaten bulunan görsel ikinci kez "imza" (e-Fatura QR) sayılmaz; aynı görsel
+            # tek bulgudur. ETTN türü açıkken e-Fatura olmayan belgede de bu arama çalışır (deneme 6 D1).
+            kod_rects = [r for f in findings if f.kind == "gorsel_kod" and f.page == index + 1 for r in f.rects]
             for i, (ftype, region) in enumerate(find_efatura_visuals(page, rules, text)):
                 if region.image_xref and region.image_xref in seen_xrefs:
+                    continue
+                if ftype == "imza" and any(
+                    (pymupdf.Rect(r) & region.rect).get_area() >= 0.5 * pymupdf.Rect(r).get_area() for r in kod_rects
+                ):
                     continue
                 if region.image_xref:
                     seen_xrefs.add(region.image_xref)
