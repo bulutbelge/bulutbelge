@@ -150,6 +150,16 @@ METHOD_LABELS = {
 }
 
 
+def kacak_iletisi(turler: list[str], yer: str = "çıktıda") -> str:
+    """Kaçak denetimi iletisi: kaç değer kaldı ve hangi türlerden (değerin kendisi yazılmaz; ileti arayüze ve
+    günlüğe gider). Tür adları arayüzde tek tek çevrilir."""
+    adlar = sorted({DATA_TYPES[k].label if k in DATA_TYPES else k for k in turler})
+    return (
+        f"Kaçak tespiti: maskelenmesi gereken {len(turler)} değer {yer} hâlâ okunuyor "
+        f"({', '.join(adlar)}). Dosya yazılmadı."
+    )
+
+
 class RuleError(ValueError):
     """Kurallarda kullanıcıya gösterilecek bir hata."""
 

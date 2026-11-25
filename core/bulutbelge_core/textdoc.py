@@ -28,7 +28,7 @@ from .detect import HIGH, MEDIUM, Finding, detect
 from .loose import find_split_cells
 from .names import name_hints
 from .pdf import PdfError, _normalize, count_types, unique_path
-from .rules import BLACKOUT, BLUR, Rules
+from .rules import BLACKOUT, BLUR, Rules, kacak_iletisi
 from .xmltok import iter_tokens
 
 # xml ve csv kendi kurallarıyla; geri kalanı düz metin gibi taranır ve maskelenir (biçim işareti taşımayan türler).
@@ -409,14 +409,16 @@ def _verify(out: str, scan: TextScan, included: list[TextFinding]) -> None:
     # Yerine yazılan metin değeri zaten içeriyorsa (genelleştirmede olabilir) kaçak sayılmaz.
     # Tablo eylemleri (yaş/tarih) hücre konumuyla yapılır; kaydırılmış değer başka satırın özgün değeriyle
     # çakışabileceği için bu denetime girmez.
-    must_be_gone = {
-        _normalize(f.finding.value)
-        for f in included
-        if _normalize(f.finding.value) not in _normalize(f.replacement) and not f.finding.source.startswith("sütun-")
-    } - kept
-    leaked = sum(1 for v in must_be_gone if v and v in text)
+    # Çıktı ham biçimiyle (XML etiketleri, JSON anahtarları dahil) okunur; 1-2 karakterlik değerler (bina no "5")
+    # orada rastlantıyla geçer ve gerçek kaçak olmadan kaydı engellerdi.
+    must_be_gone: dict[str, str] = {}
+    for f in included:
+        v = _normalize(f.finding.value)
+        if len(v) >= 3 and v not in _normalize(f.replacement) and not f.finding.source.startswith("sütun-") and v not in kept:
+            must_be_gone.setdefault(v, f.finding.type)
+    leaked = [tur for v, tur in must_be_gone.items() if v in text]
     if leaked:
-        raise PdfError(f"Kaçak tespiti: maskelenmesi gereken {leaked} değer çıktıda hâlâ okunuyor. Dosya yazılmadı.")
+        raise PdfError(kacak_iletisi(leaked))
 
 
 def _as_utf8(out: str) -> bytes:

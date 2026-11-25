@@ -86,13 +86,17 @@ export default {
   "{n} bulgunun belgedeki yeri bulunamadı. Bunları listeden çıkarıp elle kontrol edin.": "The location of {n} {n:finding|findings} in the document could not be found. Remove them from the list and check them manually.",
   "Parolalı kopya doğrulanamadı. Dosya yazılmadı.": "The password-protected copy could not be verified. The file was not written.",
 
-  // Kaçak tespiti (office.py, pdf.py, textdoc.py)
-  "Kaçak tespiti: maskelenmesi gereken {n} değer belgenin başka bir yerinde (gizli alan, bağlantı, formül, özellik) hâlâ okunuyor. Dosya yazılmadı.":
-    "Leak detection: {n} {n:value|values} that should be masked can still be read elsewhere in the document (hidden field, link, formula, property). The file was not written.",
-  "Kaçak tespiti: çıkarılan sayfalardaki {n} değer kopyada hâlâ okunuyor. Dosya yazılmadı.":
-    "Leak detection: {n} {n:value|values} from the removed pages can still be read in the copy. The file was not written.",
-  "Kaçak tespiti: maskelenmesi gereken {n} değer çıktıda hâlâ okunuyor. Dosya yazılmadı.":
-    "Leak detection: {n} {n:value|values} that should be masked can still be read in the output. The file was not written.",
+  // Kaçak tespiti (rules.kacak_iletisi: office.py, pdf.py, textdoc.py, eposta.py, udf.py).
+  // {turler} virgülle ayrılmış tür adlarıdır; i18n.tsx her adı ayrıca çevirir.
+  "Kaçak tespiti: maskelenmesi gereken {n} değer belgenin başka bir yerinde (gizli alan, bağlantı, formül, özellik) hâlâ okunuyor ({turler}). Dosya yazılmadı.":
+    "Leak detection: {n} {n:value|values} that should be masked can still be read elsewhere in the document (hidden field, link, formula, property) ({turler}). The file was not written.",
+  "Kaçak tespiti: maskelenmesi gereken {n} değer belgenin başka bir yerinde hâlâ okunuyor ({turler}). Dosya yazılmadı.":
+    "Leak detection: {n} {n:value|values} that should be masked can still be read elsewhere in the document ({turler}). The file was not written.",
+  "Kaçak tespiti: maskelenmesi gereken {n} değer kopyada hâlâ okunuyor ({turler}). Dosya yazılmadı.":
+    "Leak detection: {n} {n:value|values} that should be masked can still be read in the copy ({turler}). The file was not written.",
+  "Kaçak tespiti: maskelenmesi gereken {n} değer çıktıda hâlâ okunuyor ({turler}). Dosya yazılmadı.":
+    "Leak detection: {n} {n:value|values} that should be masked can still be read in the output ({turler}). The file was not written.",
+  "Gizli alan": "Hidden field",
 
   // Tarama uyarıları (office.py, pdf.py, textdoc.py, image.py)
   "Belgede taranamayan {n} görsel var ({turler}): içlerindeki yazı ve yüzler taranmadı, maskeli kopyada olduğu gibi kalır. Kendiniz kontrol edin; gerekirse belgeyi PDF'e çevirip “Alan seç” ile maskeleyin.":

@@ -717,7 +717,9 @@ def scan_ubl_xml(text: str, rules: Rules, hints: frozenset[str], lead: bool) -> 
                 continue
 
             # Taraf kimlik/unvan/adres/vergi dairesi
-            in_party = bool(path_set & _PARTY_CONTAINERS)
+            # UBL'de taraf blokları "...Party" ile biter (SenderParty, ReceiverParty, DespatchSupplierParty,
+            # DeliveryCustomerParty...); yalnızca bilinen adlara bakmak uygulama yanıtı ve irsaliye taraflarını kaçırıyordu.
+            in_party = bool(path_set & _PARTY_CONTAINERS) or any(t.endswith("Party") for t in path_set)
             if in_party:
                 if node.tag in ("Name", "RegistrationName") and parent in ("PartyName", "PartyLegalEntity"):
                     if enabled("kurum_unvani"):

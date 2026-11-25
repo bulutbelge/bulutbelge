@@ -60,6 +60,8 @@ export function WordPreview({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [boxes, setBoxes] = useState<Box[]>([]);
+  // Yazı tipleri sonradan yüklenip metin yeniden dizilince kutular yeniden ölçülür.
+  const [reflow, setReflow] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
   // Belge kapalı bir shadow root içinde çizilir (güvenlik taraması F12-F14, F28): belgenin CSS'i uygulamanın
   // geri kalanına ulaşmaz. Kök (host) bu öğedir; çizim ve stil kabı `docShadow` ile shadow root'ta oluşturulur.
@@ -131,8 +133,29 @@ export function WordPreview({
       setBoxes([]);
       return;
     }
-    setBoxes(locate(docShadow(docRef.current).body, docRef.current, findings, zoom));
-  }, [loading, mode, findings, zoom]);
+    setBoxes(locate(docShadow(docRef.current).body, docRef.current, findings));
+  }, [loading, mode, findings, zoom, reflow]);
+
+  // Kutular çizimden hemen sonra ölçülür; gömülü ya da yedek yazı tipi geç yüklenirse satırlar kayar ve kutular
+  // metnin yanına düşer (Intel Mac denemesi). Yazı tipi yüklemesi ve belge boyutu değişince yeniden ölçülür.
+  useEffect(() => {
+    if (loading || !docRef.current) return;
+    let alive = true;
+    const bump = () => alive && setReflow((n) => n + 1);
+    const fonts = document.fonts;
+    fonts?.ready.then(bump);
+    fonts?.addEventListener?.("loadingdone", bump);
+    const body = docShadow(docRef.current).body;
+    const ro = new ResizeObserver(bump);
+    ro.observe(body);
+    const late = window.setTimeout(bump, 400);
+    return () => {
+      alive = false;
+      fonts?.removeEventListener?.("loadingdone", bump);
+      ro.disconnect();
+      window.clearTimeout(late);
+    };
+  }, [loading, path]);
 
   useEffect(() => {
     if (!hovered || !wrapRef.current) return;
@@ -377,7 +400,7 @@ export function neutralizeRenderedDoc(root: HTMLElement) {
 const guarded = new WeakSet<HTMLElement>();
 
 /** Çizilmiş belgede bulgu değerlerini bulur, ekrandaki kutularını döndürür (yakınlaştırmasız px). */
-function locate(root: HTMLElement, originEl: HTMLElement, findings: PdfFinding[], zoom: number): Box[] {
+function locate(root: HTMLElement, originEl: HTMLElement, findings: PdfFinding[]): Box[] {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: { node: Text; start: number }[] = [];
   let full = "";
@@ -387,6 +410,9 @@ function locate(root: HTMLElement, originEl: HTMLElement, findings: PdfFinding[]
     full += tn.data.replace(/\s/g, " ");
   }
   const origin = originEl.getBoundingClientRect();
+  // CSS `zoom` altında getClientRects'in yakınlaştırılmış mı yoksa yerleşim koordinatı mı döndüğü webview'e ve
+  // sürümüne göre değişir (WKWebView, WebView2). Varsaymak yerine ölçülür: ekrandaki genişlik / yerleşim genişliği.
+  const zoom = originEl.offsetWidth > 0 && origin.width > 0 ? origin.width / originEl.offsetWidth : 1;
   const boxes: Box[] = [];
   const nextFrom = new Map<string, number>();
 
@@ -418,7 +444,7 @@ function locate(root: HTMLElement, originEl: HTMLElement, findings: PdfFinding[]
       boxes.push({
         id: f.id,
         finding: f,
-        // getClientRects yakınlaştırılmış ekran koordinatı verir; kutular yakınlaştırılan kabın içinde.
+        // Kutular yakınlaştırılan kabın içinde; ekran koordinatı yerleşim pikseline ölçülen oranla çevrilir.
         left: (r.left - origin.left) / zoom - 1,
         top: (r.top - origin.top) / zoom - 1,
         width: r.width / zoom + 2,

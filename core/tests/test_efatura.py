@@ -352,3 +352,46 @@ def test_duz_metin_sayin_cumlesi_tc_ve_kisiyi_yutmaz():
     assert "kurum_unvani" not in turler
     temiz = clean_text(cumle, scan_paste(cumle, Rules.default()))
     assert "10000000146" not in temiz and "0532 000 00 00" not in temiz
+
+
+def _fake_uygulama_yaniti_xml() -> str:
+    """Sahte UBL-TR uygulama yanıtı: taraflar SenderParty/ReceiverParty içinde (AccountingSupplierParty değil)."""
+    def taraf(etiket: str, unvan: str, sokak: str, bina: str, ilce: str, il: str) -> str:
+        return f"""
+  <cac:{etiket}>
+    <cac:PartyName><cbc:Name>{unvan}</cbc:Name></cac:PartyName>
+    <cac:PostalAddress>
+      <cbc:StreetName>{sokak}</cbc:StreetName>
+      <cbc:BuildingNumber>{bina}</cbc:BuildingNumber>
+      <cbc:CitySubdivisionName>{ilce}</cbc:CitySubdivisionName>
+      <cbc:CityName>{il}</cbc:CityName>
+      <cac:Country><cbc:Name>Türkiye</cbc:Name></cac:Country>
+    </cac:PostalAddress>
+  </cac:{etiket}>"""
+
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<ApplicationResponse xmlns="urn:oasis:names:specification:ubl:schema:xsd:ApplicationResponse-2"
+  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+  <cbc:ID>APR2026000000001</cbc:ID>
+  {taraf("SenderParty", "Gönderen Örnek Yazılım A.Ş.", "Bahariye Caddesi", "41", "Kadıköy", "İstanbul")}
+  {taraf("ReceiverParty", "Alıcı Örnek Lojistik Ltd.", "Atatürk OSB 10002 Sokak", "58", "Çiğli", "İzmir")}
+</ApplicationResponse>
+"""
+
+
+def test_uygulama_yaniti_sender_receiver_adresleri_maskelenir(tmp_path: Path):
+    """Intel Mac denemesi bulgusu: SenderParty/ReceiverParty adresleri açık kalıyor, kaçak denetimi kaydı engelliyordu."""
+    src = tmp_path / "uygulama-yaniti.xml"
+    src.write_text(_fake_uygulama_yaniti_xml(), encoding="utf-8")
+    scan = scan_text_doc(src, efatura_rules())
+    adresler = {f.finding.value for f in scan.findings if f.finding.type == "adres"}
+    assert {"Bahariye Caddesi", "Atatürk OSB 10002 Sokak", "Kadıköy", "Çiğli", "İstanbul", "İzmir"} <= adresler
+
+    out_path, _, _ = mask_text_doc(src, tmp_path / "out.xml", efatura_rules())
+    masked = Path(out_path).read_text(encoding="utf-8")
+    ET.fromstring(masked.encode("utf-8"))
+    for secret in ("Bahariye", "Atatürk OSB", "Çiğli", "İzmir", "Gönderen Örnek", "Alıcı Örnek"):
+        assert secret not in masked
+    assert "Türkiye" in masked

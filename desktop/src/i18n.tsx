@@ -88,7 +88,8 @@ export function t(key: string, vars?: Record<string, string | number>): string {
     const m = k.re.exec(key);
     if (m) {
       const got: Record<string, string> = {};
-      k.names.forEach((n, i) => (got[n] = m[i + 1]));
+      // Yakalanan değer virgülle ayrılmış sözlük sözcükleri olabilir (ör. kaçak iletisindeki tür adları).
+      k.names.forEach((n, i) => (got[n] = m[i + 1].split(", ").map((p) => DICTS[current][p] ?? p).join(", ")));
       return doldur(k.value, { ...got, ...vars });
     }
   }

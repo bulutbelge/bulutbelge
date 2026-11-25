@@ -43,7 +43,7 @@ from .loose import find_split_cells
 from .pdf import OcrUnavailable, PdfError, _normalize, count_types, ocr_refusal, unique_path
 from .names import initials, name_hints
 from . import tablo
-from .rules import BLACKOUT, BLUR, INITIALS, KEEP_LAST4, LABEL, PSEUDONYM, Rules
+from .rules import BLACKOUT, BLUR, INITIALS, KEEP_LAST4, LABEL, PSEUDONYM, Rules, kacak_iletisi
 from .validators import digits_only
 
 MAX_BYTES = 50 * 1024 * 1024
@@ -1512,22 +1512,22 @@ def verify(
     text = _normalize(all_text(data))
     included_ids = {f.id for f in included}
     kept = {_normalize(f.finding.value) for f in findings if f.id not in included_ids}
-    must_be_gone = {
-        _normalize(f.finding.value)
-        for f in included
-        if _normalize(f.finding.value) not in _normalize(f.replacement)
-        and f.finding.source != SPLIT_NOTE  # kısa parçalar başka yerlerde rastlantıyla geçer
-    } | {_normalize(v) for v in hidden or [] if len(v.strip()) >= 3}
-    must_be_gone -= kept
+    must_be_gone: dict[str, str] = {}
+    for f in included:
+        v = _normalize(f.finding.value)
+        if v not in _normalize(f.replacement) and f.finding.source != SPLIT_NOTE:  # kısa parçalar rastlantıyla geçer
+            must_be_gone.setdefault(v, f.finding.type)
+    for v in hidden or []:
+        if len(v.strip()) >= 3:
+            must_be_gone.setdefault(_normalize(v), "Gizli alan")
+    for v in kept:
+        must_be_gone.pop(v, None)
     kalan = aktif_icerik_kaldi(data)
     if kalan:
         raise PdfError(f"Aktif içerik kaldı ({', '.join(kalan[:3])}). Dosya yazılmadı.")
-    leaked = sum(1 for v in must_be_gone if v and v in text)
+    leaked = [tur for v, tur in must_be_gone.items() if v and v in text]
     if leaked:
-        raise PdfError(
-            f"Kaçak tespiti: maskelenmesi gereken {leaked} değer belgenin başka bir yerinde "
-            "(gizli alan, bağlantı, formül, özellik) hâlâ okunuyor. Dosya yazılmadı."
-        )
+        raise PdfError(kacak_iletisi(leaked, "belgenin başka bir yerinde (gizli alan, bağlantı, formül, özellik)"))
 
 
 # ---------------------------------------------------------------- önizleme yardımcıları

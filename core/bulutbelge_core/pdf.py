@@ -27,7 +27,7 @@ from .faces import face_remains, find_faces
 from .names import name_hints
 from .visual_pii import find_barcodes_qr, find_visual_mrz, find_visual_plates, find_visual_stamps
 from .ocr import SCAN_DPI, ocr_available, ocr_textpage
-from .rules import BLACKOUT, BLUR, LABEL, Rules
+from .rules import BLACKOUT, BLUR, LABEL, Rules, kacak_iletisi
 from .signatures import (
     _KALAN_ORAN,
     _fold,
@@ -382,6 +382,25 @@ def _gorsel_bulgular(
             ekle("imza", srect, sdesc, "imza:kase", j)
 
 
+def _yazi_plakalarini_ele(findings: list[PdfFinding], index: int, words: list) -> list[PdfFinding]:
+    """Görüntüden bulunan "plaka" bölgesinde OCR rakamsız bir yazı okuyorsa (ör. renkli zemin üstündeki
+    kalın başlık "ÖRNEK BİLİŞİM") bu bir plaka değildir; Türk plakasında her zaman rakam vardır.
+    OCR bölgede hiçbir şey okuyamadıysa (bulanık fotoğraf plakası) bulgu korunur."""
+    out = []
+    for f in findings:
+        if f.kind == "gorsel_kod" and f.finding.type == "plaka" and f.page == index + 1 and f.rects:
+            r = f.rects[0]
+            icerde = [
+                w[4] for w in words
+                if (r & pymupdf.Rect(w[:4])).get_area() >= 0.5 * max(pymupdf.Rect(w[:4]).get_area(), 1e-6)
+            ]
+            yazi = "".join(icerde)
+            if sum(c.isalpha() for c in yazi) >= 4 and not any(c.isdigit() for c in yazi):
+                continue
+        out.append(f)
+    return out
+
+
 def _gorsel_tekrarlarini_ele(findings: list[PdfFinding]) -> list[PdfFinding]:
     """Görüntüden bulunan plaka/MRZ, metin katmanı ya da OCR'dan aynı yerde zaten bulunduysa tekrar sayılmaz."""
     metinden = [f for f in findings if f.kind != "gorsel_kod" and f.finding.type in ("plaka", "mrz", "imza") and f.rects]
@@ -527,6 +546,7 @@ def _scan_doc(doc: pymupdf.Document, rules: Rules, previews: bool = False, image
                     _add_stamps(findings, page, index, find_scanned_stamps(page, [], []), [], rules, previews)
                 continue
             tp = ocr_textpage(page, image)
+            findings[:] = _yazi_plakalarini_ele(findings, index, page.get_text("words", textpage=tp))
             text, boxes = _page_text(page, tp)
             ocr_pages.append(index + 1)
             # Etiketsiz renkli kaşe/imza lekesi; etiketli arama aşağıda yine çalışır.
@@ -1136,22 +1156,25 @@ def _drop_pages(path: str, drop: list[int], included: list[PdfFinding], all_find
             Path(tmp).unlink(missing_ok=True)
             raise
     try:
-        dropped_only = {
-            _normalize(f.finding.value)
-            for f in all_findings
-            if f.kind == "metin" and f.page in drop
-        } - {_normalize(f.finding.value) for f in all_findings if f.kind == "metin" and f.page in keep_pages}
-        must_be_gone = dropped_only | {
-            _normalize(f.finding.value)
-            for f in included
-            if f.kind == "metin" and _normalize(f.finding.value) not in _normalize(f.replacement)
-        }
-        must_be_gone -= {_normalize(f.finding.value) for f in all_findings if f.id not in {i.id for i in included} and f.page in keep_pages}
+        kept_pages_values = {_normalize(f.finding.value) for f in all_findings if f.kind == "metin" and f.page in keep_pages}
+        must_be_gone: dict[str, str] = {}
+        for f in all_findings:
+            v = _normalize(f.finding.value)
+            if f.kind == "metin" and f.page in drop and v not in kept_pages_values:
+                must_be_gone.setdefault(v, f.finding.type)
+        for f in included:
+            v = _normalize(f.finding.value)
+            if f.kind == "metin" and v not in _normalize(f.replacement):
+                must_be_gone.setdefault(v, f.finding.type)
+        included_ids = {i.id for i in included}
+        for f in all_findings:
+            if f.id not in included_ids and f.page in keep_pages:
+                must_be_gone.pop(_normalize(f.finding.value), None)
         with _open(tmp) as out:
             text = _normalize("".join(page.get_text("text", flags=_TEXT_FLAGS) for page in out))
-        leaked = sum(1 for v in must_be_gone if v and v in text)
+        leaked = [tur for v, tur in must_be_gone.items() if v and v in text]
         if leaked:
-            raise PdfError(f"Kaçak tespiti: çıkarılan sayfalardaki {leaked} değer kopyada hâlâ okunuyor. Dosya yazılmadı.")
+            raise PdfError(kacak_iletisi(leaked, "kopyada"))
         os.replace(tmp, path)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
@@ -1382,14 +1405,14 @@ def _verify_no_leak(
     kept = {_normalize(f.finding.value) for f in excluded if f.kind == "metin"}
     # Yerine yazılan metin değeri zaten içeriyorsa (ör. genelleştirilmiş "Istanbul" yine "Istanbul")
     # değer çıktıda bilerek bulunur; kaçak sayılmaz.
-    must_be_gone = {
-        _normalize(f.finding.value)
-        for f in text_included
-        if _normalize(f.finding.value) not in _normalize(f.replacement)
-    } - kept
+    must_be_gone: dict[str, str] = {}
+    for f in text_included:
+        v = _normalize(f.finding.value)
+        if v not in _normalize(f.replacement) and v not in kept:
+            must_be_gone.setdefault(v, f.finding.type)
 
     kept_digests = {f.image_digest for f in excluded if f.image_digest}
-    gone_digests = {f.image_digest for f in included if f.image_digest} - kept_digests
+    gone_digests = {f.image_digest: f.finding.type for f in included if f.image_digest and f.image_digest not in kept_digests}
     strokes = [f for f in included if f.kind == "cizim"]
     areas = [f for f in included if f.kind == "alan"]
     faces = [f for f in included if f.kind == "yuz"]
@@ -1400,10 +1423,10 @@ def _verify_no_leak(
         for page_no in ocr_pages or []:
             page = out[page_no - 1]
             text += _normalize(page.get_text("text", textpage=ocr_textpage(page, image)))
-        leaked = sum(1 for v in must_be_gone if v and v in text)
+        leaked = [tur for v, tur in must_be_gone.items() if v and v in text]
         if gone_digests:
             for page in out:
-                leaked += sum(1 for info in page.get_image_info(hashes=True) if info.get("digest") in gone_digests)
+                leaked += [gone_digests[d] for info in page.get_image_info(hashes=True) if (d := info.get("digest")) in gone_digests]
         for f in areas:
             # Kenardaki harf parçaları sayılmasın diye alan biraz daraltılır.
             inner = f.rects[0] + (1, 1, -1, -1)
@@ -1411,21 +1434,19 @@ def _verify_no_leak(
                 kalan = out[f.page - 1].get_textbox(inner).strip()
                 # Gerekçeli alanda yerine yazılan "[gerekçe]" etiketi kalması beklenir; başka yazı kaçaktır.
                 if kalan and not (f.reason and _normalize(kalan) in _normalize(f.replacement)):
-                    leaked += 1
+                    leaked.append(f.finding.type)
         for f in faces:
             # Yüz bölgesi silindiyse kaydedilen sayfada orada yüz bulunmamalı.
             if face_remains(out[f.page - 1], f.rects[0]):
-                leaked += 1
+                leaked.append(f.finding.type)
         for f in strokes:
             region = f.rects[0]
-            leaked += sum(
-                1
+            leaked += [
+                f.finding.type
                 for d in out[f.page - 1].get_drawings()
                 if is_stroke_drawing(d) and region.contains(pymupdf.Rect(d["rect"]))
-            )
+            ]
     finally:
         out.close()
     if leaked:
-        raise PdfError(
-            f"Kaçak tespiti: maskelenmesi gereken {leaked} değer çıktıda hâlâ okunuyor. Dosya yazılmadı."
-        )
+        raise PdfError(kacak_iletisi(leaked))

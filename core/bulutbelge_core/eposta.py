@@ -29,7 +29,7 @@ from pathlib import Path
 from .gecici import klasor_ac
 from .detect import Finding
 from .pdf import PdfError, count_types, unique_path
-from .rules import Rules
+from .rules import Rules, kacak_iletisi
 from .textdoc import _scan_text
 
 EML_EXTS = {".eml"}
@@ -411,14 +411,14 @@ def _verify_output(data: bytes, w: _Walker) -> None:
     from .pdf import _normalize
 
     hay = _normalize("\n".join(_visible_texts(_load(data))))
-    leaked = 0
+    leaked: list[str] = []
     for _text, inc in w._verify:
         for f in inc:
             v = _normalize(f.finding.value)
             if v and v not in _normalize(f.replacement) and v in hay:
-                leaked += 1
+                leaked.append(f.finding.type)
     if leaked:
-        raise PdfError(f"Kaçak tespiti: maskelenmesi gereken {leaked} değer çıktıda hâlâ okunuyor. Dosya yazılmadı.")
+        raise PdfError(kacak_iletisi(leaked))
 
 
 def _visible_texts(msg: Message) -> list[str]:
