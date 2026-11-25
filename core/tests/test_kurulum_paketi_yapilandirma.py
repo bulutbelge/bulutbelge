@@ -97,6 +97,22 @@ def test_derleme_yml_gecerli_ve_cevrimdisi_adim_var():
     assert "sha256sum" in metin
 
 
+def test_derleme_yml_intel_mac_satiri():
+    """Intel Mac paketi: Intel makinede (macos-15-intel) x86_64 hedefiyle derlenir; motor bağımlılıkları
+    macos_intel_derle.py ile kurulur (önbellekli); imza, notarize ve mühür adımları iki Mac satırında da çalışır."""
+    metin = DERLEME.read_text(encoding="utf-8")
+    satir = re.search(r"mac_intel='(\{.*\})'", metin)
+    assert satir, "Intel Mac matris satırı yok"
+    intel = json.loads(satir.group(1))
+    assert intel["calistirici"] == "macos-15-intel" and intel["hedef"] == "x86_64-apple-darwin"
+    assert intel["intel"] is True and intel["paketler"] == "dmg" and intel["mcpb"] == ""
+    assert 'liste="[$win,$mac,$mac_intel,$lin]"' in metin
+    assert "macos_intel_derle.py --onbellek ~/.cache/bb-intel --kilit-yaz" in metin and "--kur" in metin
+    assert "matrix.ad == 'macos'" not in metin, "macOS adımları startsWith(matrix.ad, 'macos') ile iki satırı da kapsamalı"
+    assert metin.count("startsWith(matrix.ad, 'macos')") == 3
+    assert "if: matrix.mcpb != ''" in metin
+
+
 def test_testler_yml_cekme_isteginde_guvenli_ve_sabit():
     """Çekme isteği testleri: dış katkıcı kodu çalışır, bu yüzden salt okuma ve pull_request_target yok.
     İş adı `Testler` dal kuralında zorunlu kontroldür (scripts/github_koruma.sh)."""
