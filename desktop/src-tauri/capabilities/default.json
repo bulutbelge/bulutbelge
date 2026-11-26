@@ -15,6 +15,12 @@
       "allow": [
         {
           "url": "https://bulutbelge.com/*"
+        },
+        {
+          "url": "mailto:info@bulutbelge.com*"
+        },
+        {
+          "url": "https://github.com/bulutbelge/bulutbelge/issues*"
         }
       ]
     }

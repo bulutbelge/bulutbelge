@@ -23,14 +23,15 @@ BUILTIN_PURPOSES: tuple[tuple[str, str, dict[str, tuple[bool, str]]], ...] = (
     (
         "denetci",
         "Denetçiye",
-        # İz sürülebilsin: baş harfler, son 4 hane, il-ilçe, doğum yılı; tutarlar açık kalır.
+        # İz sürülebilsin: baş harfler, son 4 hane, il-ilçe, doğum yılı; tutarlar aralığa çevrilir
+        # (büyüklük görünür, kesin değer gitmez).
         {
             "kisi_adi": (True, "bas_harf"),
             "tc_kimlik": (True, "son4"),
             "telefon": (True, "son4"),
             "adres": (True, "il_ilce"),
             "dogum_tarihi": (True, "yil"),
-            "tutar": (False, "genel"),
+            "tutar": (True, "genel"),
         },
     ),
     (

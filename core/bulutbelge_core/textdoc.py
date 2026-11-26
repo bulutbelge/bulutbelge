@@ -28,7 +28,7 @@ from .detect import HIGH, MEDIUM, Finding, detect
 from .loose import find_split_cells
 from .names import name_hints
 from .pdf import PdfError, _normalize, count_types, unique_path
-from .rules import BLACKOUT, BLUR, Rules, kacak_iletisi
+from .rules import BLACKOUT, BLUR, Rules, kacak_iletisi, kacak_kabul
 from .xmltok import iter_tokens
 
 # xml ve csv kendi kurallarıyla; geri kalanı düz metin gibi taranır ve maskelenir (biçim işareti taşımayan türler).
@@ -417,7 +417,7 @@ def _verify(out: str, scan: TextScan, included: list[TextFinding]) -> None:
         if len(v) >= 3 and v not in _normalize(f.replacement) and not f.finding.source.startswith("sütun-") and v not in kept:
             must_be_gone.setdefault(v, f.finding.type)
     leaked = [tur for v, tur in must_be_gone.items() if v in text]
-    if leaked:
+    if leaked and not kacak_kabul(leaked):
         raise PdfError(kacak_iletisi(leaked))
 
 

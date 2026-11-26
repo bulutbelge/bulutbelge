@@ -27,7 +27,7 @@ from lxml import etree
 from .detect import Finding, detect
 from .names import name_hints
 from .pdf import PdfError, _normalize, count_types, unique_path
-from .rules import Rules, kacak_iletisi
+from .rules import Rules, kacak_iletisi, kacak_kabul
 
 UDF_EXTS = {".udf"}
 MAX_BYTES = 50 * 1024 * 1024
@@ -266,7 +266,7 @@ def mask_udf(
     for f in included:
         gone.setdefault(_normalize(f.finding.value), f.finding.type)
     leaked = [tur for v, tur in gone.items() if v and v not in kept and v in text]
-    if leaked:
+    if leaked and not kacak_kabul(leaked):
         raise PdfError(kacak_iletisi(leaked, "belgenin başka bir yerinde"))
 
     tmp_fd, tmp_name = tempfile.mkstemp(suffix=dst.suffix, dir=dst.parent)

@@ -6,6 +6,8 @@ ifadeleri ve kalıpları, maskelenmeyecek değerleri (beyaz liste) taşır.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -158,6 +160,32 @@ def kacak_iletisi(turler: list[str], yer: str = "çıktıda") -> str:
         f"Kaçak tespiti: maskelenmesi gereken {len(turler)} değer {yer} hâlâ okunuyor "
         f"({', '.join(adlar)}). Dosya yazılmadı."
     )
+
+
+# Kaçağa rağmen kaydetme (26 Kasım 2026 ürün sahibi kararı). Varsayılan: kaçak varsa dosya yazılmaz.
+# Yalnızca masaüstü arayüzünde kullanıcı açıkça onaylarsa motor bu bağlamı tek bir kaydetme için açar; ajan
+# komutu, MCP ve sunucu açmaz. Açıkken kalan türler not edilir (değer değil), çağıran rapora ve günlüğe yazar.
+_KACAK_IZNI: ContextVar[list[str] | None] = ContextVar("kacak_izni", default=None)
+
+
+@contextmanager
+def kacak_izni():
+    """Bu blokta kaçak denetimi dosyayı engellemez; blok, kalan türlerin listesini verir."""
+    kalan: list[str] = []
+    token = _KACAK_IZNI.set(kalan)
+    try:
+        yield kalan
+    finally:
+        _KACAK_IZNI.reset(token)
+
+
+def kacak_kabul(turler: list[str]) -> bool:
+    """Kaçak bulunduğunda çağrılır: kullanıcı izni varsa türleri not edip True döner (yazmaya devam), yoksa False."""
+    kalan = _KACAK_IZNI.get()
+    if kalan is None:
+        return False
+    kalan.extend(turler)
+    return True
 
 
 class RuleError(ValueError):

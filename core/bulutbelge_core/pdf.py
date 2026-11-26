@@ -27,7 +27,7 @@ from .faces import face_remains, find_faces
 from .names import name_hints
 from .visual_pii import find_barcodes_qr, find_visual_mrz, find_visual_plates, find_visual_stamps
 from .ocr import SCAN_DPI, ocr_available, ocr_textpage
-from .rules import BLACKOUT, BLUR, LABEL, Rules, kacak_iletisi
+from .rules import BLACKOUT, BLUR, LABEL, Rules, kacak_iletisi, kacak_kabul
 from .signatures import (
     _KALAN_ORAN,
     _fold,
@@ -1173,7 +1173,7 @@ def _drop_pages(path: str, drop: list[int], included: list[PdfFinding], all_find
         with _open(tmp) as out:
             text = _normalize("".join(page.get_text("text", flags=_TEXT_FLAGS) for page in out))
         leaked = [tur for v, tur in must_be_gone.items() if v and v in text]
-        if leaked:
+        if leaked and not kacak_kabul(leaked):
             raise PdfError(kacak_iletisi(leaked, "kopyada"))
         os.replace(tmp, path)
     except BaseException:
@@ -1448,5 +1448,5 @@ def _verify_no_leak(
             ]
     finally:
         out.close()
-    if leaked:
+    if leaked and not kacak_kabul(leaked):
         raise PdfError(kacak_iletisi(leaked))

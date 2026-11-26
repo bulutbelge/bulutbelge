@@ -15,6 +15,7 @@ import {
 } from "./settings";
 import { denetimAcik, denetimiAyarla } from "./guncelleme";
 import { HakkindaBolumu } from "./Hakkinda";
+import { SorunBildirBolumu } from "./SorunBildir";
 import { LANGUAGES, useLang, useT } from "./i18n";
 import { open, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { ThemeChoice } from "./theme";
@@ -24,6 +25,7 @@ import type { ColumnRule } from "./engine";
 // Sütun kuralında kullanılamayan türler (çekirdekteki COLUMN_EXCLUDED ile aynı).
 const COLUMN_EXCLUDED = ["yuz", "imza", "elle", "ozel_ifade", "ozel_kalip"];
 import { DeleteVault, PasswordForm, PseudonymPanel, UnlockForm } from "./Vault";
+import { CopyPasswords } from "./CopyPasswords";
 
 /**
  * Ayarlar: Sade 2 sütunlu düzen.
@@ -237,6 +239,7 @@ export function SettingsPage({
         </div>
 
         <HakkindaBolumu />
+        <SorunBildirBolumu />
       </aside>
 
       <div className="settings-main">
@@ -471,6 +474,20 @@ export function SettingsPage({
                   {t("Kapalıyken aynı kişi tüm belgelerde aynı takma adı alır; bu, belgelerin birbiriyle eşleştirilmesini kolaylaştırır. Takma ad anonimleştirme değildir.")}
                 </p>
                 <AllowPanel />
+              </section>
+
+              <section className="card">
+                <h3>
+                  <Icon name="lock" size={16} /> {t("Kopya parolaları")}
+                </h3>
+                <p className="hint">
+                  {t("PDF kopyayı korumak için sık kullandığınız parolalar; kaydederken listeden seçilir. Kasada şifreli durur, yalnızca bu uygulamanın arayüzünden kullanılır (ajan komutu ve MCP kullanamaz).")}
+                </p>
+                {vault.unlocked ? (
+                  <CopyPasswords />
+                ) : (
+                  <p className="hint">{t("Kopya parolalarını görmek için yukarıdan kasanın kilidini açın.")}</p>
+                )}
               </section>
             </div>
           </details>

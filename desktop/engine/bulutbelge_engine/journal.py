@@ -194,8 +194,10 @@ def run(
     target_of: Callable[[dict[str, Any]], str | None] = lambda _r: None,
     hash_source: bool = True,
     purpose: str | None = None,
+    result_of: Callable[[dict[str, Any]], tuple[str, str | None]] = lambda _r: ("basarili", None),
 ) -> dict[str, Any]:
-    """`fn`i çalıştırır, sonucu (başarılı ya da hata) günlüğe yazar. `purpose`: işlemin gerekçesi."""
+    """`fn`i çalıştırır, sonucu (başarılı ya da hata) günlüğe yazar. `purpose`: işlemin gerekçesi.
+    `result_of`: başarılı sonucun günlükteki adı ve notu (ör. kaçağa rağmen kayıt: "kacakla", türler)."""
     lg = _preflight()
     caller, agent = CALLER.get()
     src_hash = file_sha256(source) if source and hash_source else None
@@ -210,10 +212,12 @@ def run(
         raise
 
     target = target_of(result)
+    outcome, note = result_of(result)
     try:
         lg.append(
             op,
-            result="basarili",
+            result=outcome,
+            error=note,
             target=target,
             target_sha256=file_sha256(target) if target else None,
             counts=counts_of(result),

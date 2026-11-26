@@ -7,6 +7,7 @@ import { ReviewExtras } from "./ReviewExtras";
 import { localeCode, t, useT } from "./i18n";
 import { enabledTypeCount, Profile } from "./settings";
 import { SonucNotu } from "./Hakkinda";
+import { sonucAciklamasi, sonucBasligi } from "./KacakKayit";
 import { Icon, IconName, PathChanged } from "./ui";
 
 export type LayoutMode = "studio" | "wizard" | "classic";
@@ -334,6 +335,8 @@ export interface SharedLayoutProps {
   previewNode: (v: "orijinal" | "maskeli" | "kaydedilen") => ReactNode;
   searchHideNode: ReactNode;
   passwordNode: ReactNode;
+  /** Kaydetme reddedildiyse (ör. kaçak tespiti) nedeni: kaydet düğmesinin hemen yanında gösterilir. */
+  saveErrorNode?: ReactNode;
   saveLineNode: ReactNode;
   leftOpenNode: ReactNode;
 }
@@ -2078,9 +2081,11 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                 <Icon name="check" size={26} />
               </span>
               <div>
-                <h2 className="side-title">{t("Güvenli kopya hazır")}</h2>
+                <h2 className="side-title">{sonucBasligi(t, p.done)}</h2>
                 <p className="side-sub">
-                  {t("{n} kişisel bilgi belgeden gerçekten silindi ve dosya yeniden okunarak kontrol edildi.", { n: p.done.masked })}
+                  {p.done.leaked?.length
+                    ? sonucAciklamasi(t, p.done)
+                    : t("{n} kişisel bilgi belgeden gerçekten silindi ve dosya yeniden okunarak kontrol edildi.", { n: p.done.masked })}
                 </p>
               </div>
             </div>
@@ -2582,6 +2587,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                     {p.allFindings.length === 0 && p.dropped.size === 0 ? t("Maskelenecek bilgi yok") : p.saveLabel}
                   </button>
                 )}
+                {p.saveErrorNode}
               </div>
             )}
           </>
@@ -3154,6 +3160,7 @@ export function WizardWorkspace(p: SharedLayoutProps) {
                     >
                       {t("Adım 3: {label}", { label: p.saveLabel })} <Icon name="arrowRight" size={16} />
                     </button>
+                    {p.saveErrorNode}
                   </div>
                 </div>
               </>
@@ -3170,10 +3177,8 @@ export function WizardWorkspace(p: SharedLayoutProps) {
               </span>
               <div className="wizard-done-text">
                 <span className="wizard-badge ok">{t("Adım 3 Tamamlandı · Paylaşım Amacı: {amac}", { amac: currentPurpose.label })}</span>
-                <h1>{t("Güvenli kopya hazır")}</h1>
-                <p>
-                  {p.done.warnings.some((w) => w.includes("imza izleri")) ? t("{n} kişisel bilgi belgeden silindi, ama imza bölgesinde izler kalmış olabilir. Kopyayı açıp imzayı gözle kontrol edin.", { n: p.done.masked }) : t("{n} kişisel bilgi belgeden gerçekten silindi. Dosya yeniden okunarak kontrol edildi; iz kalmadı.", { n: p.done.masked })}
-                </p>
+                <h1>{sonucBasligi(t, p.done)}</h1>
+                <p>{sonucAciklamasi(t, p.done)}</p>
                 <SonucNotu />
               </div>
               <div className="wizard-done-cta">

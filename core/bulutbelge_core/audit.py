@@ -88,7 +88,8 @@ FIELDS = (
 # "erisim": panelde kim neye baktı (giriş, çıkış, sayfa, kayıt ayrıntısı, CSV); belge yok.
 OPS = ("okuma", "maskeleme", "disa_aktarma", "onizleme", "maske_kaldirma", "yonetim", "erisim")
 CALLERS = ("kullanici", "ajan")
-RESULTS = ("basarili", "hata", "reddedildi")
+# "kacakla": kaçak denetimi değer bulduğu hâlde kullanıcı açıkça onaylayıp kaydetti (masaüstü).
+RESULTS = ("basarili", "hata", "reddedildi", "kacakla")
 
 _LOCK_TIMEOUT = 10.0
 

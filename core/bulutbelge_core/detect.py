@@ -237,6 +237,9 @@ def detect(
             except TimeoutError:
                 raise PatternTimeout(p.name) from None
 
+    if enabled("kurum_unvani"):
+        candidates.extend(_unvan_fragments(text, candidates))
+
     read = [r for r in (_read_label(text, f) for f in uncertain) if r is not None]
     candidates.extend(f for f in read if f.confidence != LOW)
     uncertain = [f for f in read if f.confidence == LOW] + name_uncertain
@@ -281,6 +284,32 @@ def _read_label(text: str, f: Finding) -> Finding | None:
 
 
 _INSTITUTION_TYPES = ("kisi_adi", "adres")
+
+# Bulunan kurum unvanının başka satırlarda tek başına duran parçaları (formlarda uzun unvan "Soyadı / Ünvanı" ve
+# "Adı" gibi alanlara bölünür: "ÖRNEK YAZILIM SİSTE" + "M DANIŞMANLIK BİLGİS"). Yalnızca belgede zaten bulunmuş bir
+# unvanın birebir alt dizesi olan ve en az iki sözcüklü satırlar alınır; güven orta.
+_FRAGMENT_MIN = 12
+_LINE_RE = re.compile(r"[^\r\n]+")
+
+
+def _fold(s: str) -> str:
+    return " ".join(s.casefold().split())
+
+
+def _unvan_fragments(text: str, candidates: list[Finding]) -> list[Finding]:
+    names = [_fold(f.value) for f in candidates if f.type == "kurum_unvani" and len(f.value.strip()) >= 2 * _FRAGMENT_MIN]
+    if not names:
+        return []
+    out: list[Finding] = []
+    for m in _LINE_RE.finditer(text):
+        value = m.group().strip()
+        if len(value) < _FRAGMENT_MIN or len(value.split()) < 2 or not re.search(r"[^\W\d_]{3}", value):
+            continue
+        folded = _fold(value)
+        if any(folded in name and folded != name for name in names):
+            start = m.start() + m.group().index(value)
+            out.append(Finding("kurum_unvani", start, start + len(value), value, MEDIUM, "bulunan unvanın parçası"))
+    return out
 
 
 class PatternTimeout(Exception):

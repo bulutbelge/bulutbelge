@@ -36,6 +36,10 @@ from .protocol import EngineError
 SETTINGS_FILE = "settings.json"
 VAULT_FILE = "terms.bbvault"
 MIN_PASSWORD = 8
+# Kopya (PDF) parolası: çekirdekteki sınırla aynı (bulutbelge_core.pdf.MIN_PASSWORD).
+MIN_COPY_PASSWORD = 6
+MAX_COPY_PASSWORDS = 50
+MAX_COPY_PASSWORD_NAME = 60
 
 _SCRYPT = {"n": 2**15, "r": 8, "p": 1}
 _AAD = b"bulutbelge-terms-v1"
@@ -137,9 +141,26 @@ def load_settings() -> dict[str, Any]:
             known_builtins = {"musteri", "denetci", "kurum_ici"}
         ids = {p["id"] for p in profiles}
         profiles.extend(p for p in builtin_profiles() if p["id"] not in ids and p["id"] not in known_builtins)
+    if data.get("seeded"):
+        _migrate_profiles(profiles, set(data.get("migrations") or []))
     if not any(p["id"] == active for p in profiles):
         active = DEFAULT_PROFILE_ID
     return {"profiles": profiles, "active": active}
+
+
+# Hazır profil değişikliklerinin mevcut kurulumlara bir kez uygulanması. Kayıtta hepsi "yapıldı"
+# işaretlenir; kullanıcı sonradan geri alırsa göç tekrar çalışmaz.
+_MIGRATIONS = ("denetci_tutar",)
+
+
+def _migrate_profiles(profiles: list[dict[str, Any]], done: set[str]) -> None:
+    if "denetci_tutar" not in done:
+        # Denetçiye önceden tutarı açık bırakıyordu. Kural hâlâ eski hazır değerdeyse (kapalı, aralık)
+        # aralığa çevirme açılır; kullanıcı yöntemi değiştirdiyse dokunulmaz.
+        for p in profiles:
+            rule = p["types"].get("tutar") if p["id"] == "denetci" else None
+            if rule == {"enabled": False, "method": "genel"}:
+                rule["enabled"] = True
 
 
 def save_settings(params: dict[str, Any]) -> dict[str, Any]:
@@ -160,6 +181,7 @@ def save_settings(params: dict[str, Any]) -> dict[str, Any]:
         "profiles": profiles,
         "seeded": True,
         "seeded_builtins": [pid for pid, _, _ in BUILTIN_PURPOSES],
+        "migrations": list(_MIGRATIONS),
     }
     _write_atomic(data_dir() / SETTINGS_FILE, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
     return {"profiles": profiles, "active": active}
@@ -291,9 +313,12 @@ def _clean_terms(raw: Any) -> dict[str, list[str]]:
 class Vault:
     """Motor süreci boyunca yaşayan kasa durumu.
 
-    Kasada iki şey saklanır: profillerin özel ifadeleri ve takma ad eşleme tablosu
-    (bkz. bulutbelge_core.pseudonym). Takma ad tablosu kasadan dışarı çıkmaz; arayüze
-    yalnızca sayılar ve kullanıcının tek tek sorduğu takma adların karşılığı döner.
+    Kasada üç şey saklanır: profillerin özel ifadeleri, takma ad eşleme tablosu
+    (bkz. bulutbelge_core.pseudonym) ve adlandırılmış kopya parolaları. Takma ad tablosu
+    kasadan dışarı çıkmaz; arayüze yalnızca sayılar ve kullanıcının tek tek sorduğu takma
+    adların karşılığı döner. Kopya parolalarının arayüzdeki listesinde yalnızca ad vardır;
+    değer maskelemede motorda okunur, arayüze yalnızca kullanıcı "Göster" deyince gelir
+    (karar: 2026-11-25-kayitli-kopya-parolalari.md).
     """
 
     def __init__(self) -> None:
@@ -301,6 +326,7 @@ class Vault:
         self._salt: bytes | None = None
         self._terms: dict[str, list[str]] = {}
         self._pseudonyms: dict[str, Any] = {}
+        self._passwords: dict[str, dict[str, str]] = {}
 
     @property
     def unlocked(self) -> bool:
@@ -320,7 +346,9 @@ class Vault:
     def _write(self) -> None:
         assert self._key is not None and self._salt is not None
         nonce = secrets.token_bytes(12)
-        plain = json.dumps({"terms": self._terms, "pseudonyms": self._pseudonyms}, ensure_ascii=False).encode("utf-8")
+        plain = json.dumps(
+            {"terms": self._terms, "pseudonyms": self._pseudonyms, "passwords": self._passwords}, ensure_ascii=False
+        ).encode("utf-8")
         ct = AESGCM(self._key).encrypt(nonce, plain, _AAD)
         doc = {
             "format": "bbvault",
@@ -340,6 +368,7 @@ class Vault:
         self._key = _derive(password, self._salt, **_SCRYPT)
         self._terms = {}
         self._pseudonyms = {}
+        self._passwords = {}
         self._write()
         return {"terms": self._terms}
 
@@ -360,6 +389,7 @@ class Vault:
         data = json.loads(plain)
         self._terms = _clean_terms(data.get("terms") or {})
         self._pseudonyms = clean_table(data.get("pseudonyms"))
+        self._passwords = _clean_passwords(data.get("passwords"))
         return {"terms": self._terms}
 
     def save(self, terms: Any) -> dict[str, Any]:
@@ -407,6 +437,65 @@ class Vault:
         self._write()
         return {"counts": {}}
 
+    # ---- Kayıtlı kopya parolaları (PDF) ----
+
+    def _need_unlocked(self) -> None:
+        if self._key is None:
+            raise EngineError("vault_locked", "Kasa kilitli")
+
+    def passwords(self) -> dict[str, Any]:
+        """Kayıtlı kopya parolalarının yalnızca adları (değer dönmez)."""
+        self._need_unlocked()
+        items = [{"id": k, "name": v["name"]} for k, v in self._passwords.items()]
+        return {"passwords": sorted(items, key=lambda x: x["name"].casefold())}
+
+    def _check_name(self, name: Any, skip: str | None = None) -> str:
+        if not isinstance(name, str) or not name.strip():
+            raise EngineError("invalid_params", "Parolaya bir ad verin (ör. Muhasebe)")
+        name = " ".join(name.split())[:MAX_COPY_PASSWORD_NAME]
+        if any(k != skip and v["name"].casefold() == name.casefold() for k, v in self._passwords.items()):
+            raise EngineError("duplicate", "Bu adla kayıtlı bir parola zaten var")
+        return name
+
+    def password_add(self, name: Any, value: Any) -> dict[str, Any]:
+        self._need_unlocked()
+        if len(self._passwords) >= MAX_COPY_PASSWORDS:
+            raise EngineError("limit", f"En çok {MAX_COPY_PASSWORDS} kopya parolası kaydedilebilir")
+        clean = self._check_name(name)
+        _check_copy_password(value)
+        pid = secrets.token_hex(6)
+        self._passwords[pid] = {"name": clean, "value": value}
+        self._write()
+        return {"id": pid, **self.passwords()}
+
+    def password_update(self, pid: Any, name: Any = None, value: Any = None) -> dict[str, Any]:
+        self._need_unlocked()
+        item = self._password_item(pid)
+        new_name = self._check_name(name, skip=str(pid)) if name is not None else item["name"]
+        if value is not None:
+            _check_copy_password(value)
+        self._passwords[str(pid)] = {"name": new_name, "value": value if value is not None else item["value"]}
+        self._write()
+        return self.passwords()
+
+    def password_delete(self, pid: Any) -> dict[str, Any]:
+        self._need_unlocked()
+        self._password_item(pid)
+        del self._passwords[str(pid)]
+        self._write()
+        return self.passwords()
+
+    def password_value(self, pid: Any) -> str:
+        """Parolanın değeri: maskelemede motor kullanır ya da kullanıcı "Göster" deyince arayüze gider."""
+        self._need_unlocked()
+        return self._password_item(pid)["value"]
+
+    def _password_item(self, pid: Any) -> dict[str, str]:
+        item = self._passwords.get(pid) if isinstance(pid, str) else None
+        if item is None:
+            raise EngineError("not_found", "Bu kayıtlı parola yok")
+        return item
+
     def change_password(self, password: str) -> dict[str, bool]:
         if self._key is None:
             raise EngineError("vault_locked", "Kasa kilitli")
@@ -420,12 +509,38 @@ class Vault:
         self._key = self._salt = None
         self._terms = {}
         self._pseudonyms = {}
+        self._passwords = {}
         return self.status()
 
     def delete(self) -> dict[str, bool]:
         self.lock()
         self.path.unlink(missing_ok=True)
         return self.status()
+
+
+def _check_copy_password(value: Any) -> None:
+    if not isinstance(value, str) or len(value) < MIN_COPY_PASSWORD:
+        raise EngineError("weak_password", f"Kopya parolası en az {MIN_COPY_PASSWORD} karakter olmalı")
+    if len(value) > 128:
+        raise EngineError("invalid_params", "Kopya parolası en çok 128 karakter olabilir")
+
+
+def _clean_passwords(raw: Any) -> dict[str, dict[str, str]]:
+    """Kasadan okunan kopya parolaları; bozuk girdiler atlanır."""
+    out: dict[str, dict[str, str]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for pid, item in raw.items():
+        if (
+            isinstance(pid, str)
+            and isinstance(item, dict)
+            and isinstance(item.get("name"), str)
+            and isinstance(item.get("value"), str)
+            and item["name"].strip()
+            and len(item["value"]) >= MIN_COPY_PASSWORD
+        ):
+            out[pid] = {"name": item["name"], "value": item["value"]}
+    return out
 
 
 def _check_password(password: Any) -> None:

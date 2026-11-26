@@ -17,7 +17,7 @@ export interface LogRecord {
   profile: string | null;
   caller: "kullanici" | "ajan";
   agent: string | null;
-  result: "basarili" | "hata" | "reddedildi";
+  result: "basarili" | "hata" | "reddedildi" | "kacakla";
   error: string | null;
   hash: string;
 }
@@ -47,7 +47,13 @@ const OPS: Record<string, string> = {
   disa_aktarma: "Dışa aktarma",
   yonetim: "Ayar değişikliği",
 };
-const RESULTS: Record<string, string> = { basarili: "Başarılı", hata: "Hata", reddedildi: "Reddedildi" };
+const RESULTS: Record<string, string> = {
+  basarili: "Başarılı",
+  hata: "Hata",
+  reddedildi: "Reddedildi",
+  // Kaçak denetimine rağmen kullanıcı onayıyla kaydedildi
+  kacakla: "Kaçağa rağmen kaydedildi",
+};
 const EMPTY: Filters = { date_from: "", date_to: "", file: "", op: "", caller: "" };
 
 function fileName(path: string | null): string {

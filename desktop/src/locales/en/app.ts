@@ -173,4 +173,20 @@ export default {
   "Belgede yorum var. Yorumlar da taranır; yorum yazarlarının adı silinir.": "The document has comments. Comments are scanned too; comment authors' names are removed.",
   "XML'de karakter referansı (&#…;) ile yazılmış bölümler var; bunlar taranamaz, elle kontrol edin.": "The XML has sections written with character references (&#…;); these cannot be scanned, so check them manually.",
   "Belgede elektronik imza var. Maskelenen kopyada e-imza kaldırılır; imzanın geçerliliği orijinal belgede kalır.": "The document has an electronic signature. The e-signature is removed in the masked copy; the signature's validity remains in the original document.",
+  "Kayıtlı parola": "Saved password",
+  "Yeni parola yaz": "Type a new password",
+  "Kayıtlı: {ad}": "Saved: {ad}",
+  "Kopya kasadaki \"{ad}\" parolasıyla korunur. Parolayı alıcıya ayrı bir yoldan iletin.": "The copy is protected with the \"{ad}\" password from the vault. Send the password to the recipient by a separate channel.",
+  "Kayıtlı parolaları kullanmak için kasanın kilidini açın (Ayarlar).": "To use saved passwords, unlock the vault (Settings).",
+  "{n} belge kaydedilmedi (diğerleri kaydedildi):": "{n} documents were not saved (the others were saved):",
+  "Kopya kaydedildi, ama açık kalan bilgi var": "Copy saved, but some information is still readable",
+  "{n} kişisel bilgi silindi, ama {m} türde değer kopyada hâlâ okunuyor; kaçağa rağmen kaydetmeyi siz seçtiniz. Paylaşmadan önce kopyayı açıp kontrol edin.":
+    "{n} personal items were removed, but values of {m} types are still readable in the copy; you chose to save despite the leak. Open and check the copy before sharing it.",
+  "Yine de kaydet": "Save anyway",
+  "Kopyada yukarıdaki türlerden değerler açık kalacak. Bu kopyayı paylaşırsanız o bilgiler de paylaşılmış olur. Kayıt işlem günlüğüne “kaçağa rağmen” diye yazılır.":
+    "Values of the types above will remain readable in the copy. If you share this copy, that information is shared too. The save is recorded in the activity log as “despite leak”.",
+  "Evet, kaçağa rağmen kaydet": "Yes, save despite the leak",
+  "Kaçak nedeniyle kaydedilmeyen belgeyi açıp kontrol ettikten sonra tek başına “Yine de kaydet” ile kaydedebilirsiniz.":
+    "You can open a document that was not saved because of a leak, check it, and save it on its own with “Save anyway”.",
+  "Kaçağa rağmen kaydedildi": "Saved despite leak",
 } as Record<string, string>;

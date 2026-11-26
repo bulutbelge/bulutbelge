@@ -18,9 +18,10 @@ import {
   ScanResult,
 } from "./engine";
 import { PagePreview, Rect } from "./PagePreview";
-import { Profile, profileRules, SettingsData, Terms, VaultStatus } from "./settings";
+import { Profile, profileRules, SavedPassword, SettingsData, Terms, VaultStatus } from "./settings";
 import { SettingsPage } from "./SettingsPage";
 import { SonucNotu } from "./Hakkinda";
+import { kacakHatasi, KaydetmeHatasi, sonucAciklamasi, sonucBasligi } from "./KacakKayit";
 import { GuncellemeSeridi, useGuncelleme } from "./guncelleme";
 import { t, useT } from "./i18n";
 import { SheetPreview } from "./SheetPreview";
@@ -275,6 +276,11 @@ function App() {
   // Kopyanın parolası (yalnızca PDF); yalnızca bellekte, belge değişince silinir.
   const [protect, setProtect] = useState(false);
   const [password, setPassword] = useState("");
+  // Kayıtlı kopya parolası (kasada): yalnızca kimlik tutulur, değer arayüze gelmez. "" = o seferlik yazılan parola.
+  const [savedPwId, setSavedPwId] = useState("");
+  // Kaydetme reddedildiğinde (ör. kaçak tespiti: dosya yazılmadı) nedeni; kaydet düğmesinin yanında da gösterilir.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedPws, setSavedPws] = useState<SavedPassword[]>([]);
   // Düzleştir modu: yalnızca tek belge akışında, PDF için.
   const [flatten, setFlatten] = useState(false);
   // Aynı belge yeniden taranırken seçimler korunsun diye son taranan belge.
@@ -505,8 +511,26 @@ function App() {
   useEffect(() => {
     setProtect(false);
     setPassword("");
+    setSavedPwId("");
     setFlatten(false);
+    setSaveError(null);
   }, [source]);
+
+  // Kayıtlı kopya parolalarının adları: kasa açıkken yüklenir; Ayarlar'dan dönünce tazelenir.
+  const vaultOpen = Boolean(settings?.vault.unlocked);
+  useEffect(() => {
+    if (!vaultOpen) {
+      setSavedPws([]);
+      setSavedPwId("");
+      return;
+    }
+    engineCall<{ passwords: SavedPassword[] }>("vault.passwords")
+      .then((r) => {
+        setSavedPws(r.passwords);
+        setSavedPwId((cur) => (cur && !r.passwords.some((p) => p.id === cur) ? "" : cur));
+      })
+      .catch(() => setSavedPws([]));
+  }, [vaultOpen, showSettings]);
 
   // Elle seçilen alanlar belgeye aittir; kurallar değişince kalır, belge değişince silinir.
   useEffect(() => {
@@ -1029,10 +1053,12 @@ function App() {
     return [...map.values()];
   }
 
-  async function runMask() {
+  /** `kacakla`: kullanıcı kaçak uyarısını görüp "Yine de kaydet"i onayladı. */
+  async function runMask(kacakla = false) {
     if (!source || !target || !scan || !scanRules) return;
     setBusy("mask");
     setError(null);
+    setSaveError(null);
     try {
       const { manual_areas, manual_cells } = manualRequest(areas, excluded);
       const result = await engineCall<MaskResult>("doc.mask", {
@@ -1043,9 +1069,12 @@ function App() {
         manual_areas,
         manual_cells,
         drop_pages: format === "pdf" ? [...dropped].sort((a, b) => a - b) : [],
-        password: format === "pdf" && protect ? password : undefined,
+        password: format === "pdf" && protect && !savedPwId ? password : undefined,
+        password_id: format === "pdf" && protect && savedPwId ? savedPwId : undefined,
         flatten: format === "pdf" && flatten,
         make_dirs: true,
+        // Yalnızca gerçek `true` izin sayılır: tıklama olayı yanlışlıkla geçirilirse kaçak denetimi atlanmaz.
+        accept_leak: kacakla === true ? true : undefined,
       });
       setDone(result);
       setSaved((s) => ({ ...s, [source]: result }));
@@ -1070,6 +1099,7 @@ function App() {
         .catch(() => saveRecent(next));
     } catch (e) {
       setError(String(e));
+      setSaveError(String(e));
     } finally {
       setBusy(null);
     }
@@ -1083,6 +1113,7 @@ function App() {
     stash();
     setBusy("mask");
     setError(null);
+    setSaveError(null);
 
     // Eğer bu oturumda klasör daha önce maskelenmişse, üzerine yazmamak için yeni ardışık hedef klasörü (örn. _maskeli_2) al
     if (folderRoot && Object.keys(saved).length > 0) {
@@ -1101,9 +1132,12 @@ function App() {
     const rKey = JSON.stringify(scanRules);
     let updatedRecent = [...recent];
     const addedEntries: Recent[] = [];
+    // Bir belge reddedilirse (ör. kaçak tespiti) diğerleri işlenmeye devam eder; reddedilenler adıyla bildirilir.
+    const failures: { path: string; message: string }[] = [];
     try {
       for (let i = 0; i < allDocs.length; i++) {
         const docPath = allDocs[i];
+        try {
         let st = docCache.current.get(docPath);
         if (!st) {
           const res = await engineCall<ScanResult>("doc.scan", { path: docPath, rules: scanRules });
@@ -1133,7 +1167,8 @@ function App() {
           manual_areas,
           manual_cells,
           drop_pages: docFmt === "pdf" ? [...st.dropped].sort((a, b) => a - b) : [],
-          password: docFmt === "pdf" && protect ? password : undefined,
+          password: docFmt === "pdf" && protect && !savedPwId ? password : undefined,
+          password_id: docFmt === "pdf" && protect && savedPwId ? savedPwId : undefined,
           flatten: docFmt === "pdf" && docPath === source && flatten,
           make_dirs: true,
         });
@@ -1161,6 +1196,9 @@ function App() {
         };
         addedEntries.push(entry);
         updatedRecent = [entry, ...updatedRecent.filter((x) => x.target !== result.target)];
+        } catch (e) {
+          failures.push({ path: docPath, message: String(e) });
+        }
         setBatchProgress({ done: i + 1, total: allDocs.length, mode: "mask" });
         setCacheTick((c) => c + 1);
       }
@@ -1193,8 +1231,18 @@ function App() {
           })
           .catch(() => {});
       }
+      if (failures.length > 0) {
+        const lines = failures.map((f) => `${splitPath(f.path).name}: ${t(f.message)}`);
+        let msg = t("{n} belge kaydedilmedi (diğerleri kaydedildi):", { n: failures.length }) + " " + lines.join(" · ");
+        if (failures.some((f) => kacakHatasi(f.message))) {
+          msg += " " + t("Kaçak nedeniyle kaydedilmeyen belgeyi açıp kontrol ettikten sonra tek başına “Yine de kaydet” ile kaydedebilirsiniz.");
+        }
+        setError(msg);
+        setSaveError(msg);
+      }
     } catch (e) {
       setError(String(e));
+      setSaveError(String(e));
     } finally {
       setBatchProgress(null);
       setBusy(null);
@@ -1247,7 +1295,7 @@ function App() {
       : included.length === 0 && pagesOut > 0
       ? t("Sayfayı çıkar ve kaydet")
       : t("{n} bilgiyi maskele ve kaydet", { n: included.length });
-  const passwordOk = !(format === "pdf" && protect) || password.length >= MIN_PASSWORD;
+  const passwordOk = !(format === "pdf" && protect) || Boolean(savedPwId) || password.length >= MIN_PASSWORD;
   const canSave = busy === null && unlocated === 0 && passwordOk && (included.length > 0 || pagesOut > 0);
 
   function preview(v: View) {
@@ -1392,7 +1440,7 @@ function App() {
     pickFolder,
     pickTarget,
     goHome: handleHomeClick,
-    runMask,
+    runMask: () => void runMask(),
     runMaskAll: () => void runMaskAll(),
     plannedFiles,
     folderRoot,
@@ -1498,10 +1546,17 @@ function App() {
             setDone(null);
           }}
           onChange={setPassword}
+          saved={savedPws}
+          savedId={savedPwId}
+          onSavedId={setSavedPwId}
+          vaultLocked={Boolean(settings?.vault.exists && !settings.vault.unlocked)}
         />
         </>
       ) : null,
     saveLineNode: <SaveLine source={source} target={target} onChange={pickTarget} />,
+    saveErrorNode: saveError ? (
+      <KaydetmeHatasi ileti={saveError} busy={busy === "mask"} onAccept={source && !batchProgress ? () => void runMask(true) : undefined} />
+    ) : null,
     leftOpenNode: <LeftOpen findings={allFindings.filter((f) => excluded.has(f.id) && onKeptPage(f))} />,
   };
 
@@ -1656,10 +1711,8 @@ function App() {
             <Icon name="check" size={28} />
           </span>
           <div>
-            <h1 className="side-title">{t("Güvenli kopya hazır")}</h1>
-            <p className="side-sub">
-              {done.warnings.some((w) => w.includes("imza izleri")) ? t("{n} kişisel bilgi belgeden silindi, ama imza bölgesinde izler kalmış olabilir. Kopyayı açıp imzayı gözle kontrol edin.", { n: done.masked }) : t("{n} kişisel bilgi belgeden gerçekten silindi. Dosya yeniden okunarak kontrol edildi; iz kalmadı.", { n: done.masked })}
-            </p>
+            <h1 className="side-title">{sonucBasligi(t, done)}</h1>
+            <p className="side-sub">{sonucAciklamasi(t, done)}</p>
             <SonucNotu />
           </div>
           <ul className="done-list">
@@ -1781,10 +1834,13 @@ function App() {
         />
 
         <div className="result-actions">
-          <button className={"btn primary big" + (busy === "mask" ? " is-busy" : "")} disabled={!canSave} onClick={runMask}>
+          <button className={"btn primary big" + (busy === "mask" ? " is-busy" : "")} disabled={!canSave} onClick={() => void runMask()}>
             {allFindings.length === 0 && pagesOut === 0 ? t("Maskelenecek bilgi yok") : saveLabel}
           </button>
         </div>
+        {saveError && (
+          <KaydetmeHatasi ileti={saveError} busy={busy === "mask"} onAccept={source && !batchProgress ? () => void runMask(true) : undefined} />
+        )}
         {unlocated > 0 && (
           <p className="warn-text center">
             {t("{n} bilginin belgedeki yeri bulunamadı. Aşağıda belgede işaretine tıklayıp kaldırın.", { n: unlocated })}
@@ -1812,6 +1868,10 @@ function App() {
               setDone(null);
             }}
             onChange={setPassword}
+            saved={savedPws}
+            savedId={savedPwId}
+            onSavedId={setSavedPwId}
+            vaultLocked={Boolean(settings?.vault.exists && !settings.vault.unlocked)}
           />
         )}
         {extra.blackout.length > 0 && (
@@ -2074,21 +2134,49 @@ function PasswordLine({
   value,
   onToggle,
   onChange,
+  saved,
+  savedId,
+  onSavedId,
+  vaultLocked,
 }: {
   on: boolean;
   value: string;
   onToggle: (on: boolean) => void;
   onChange: (v: string) => void;
+  /** Kasadaki kayıtlı kopya parolalarının adları (değer yok). */
+  saved: SavedPassword[];
+  savedId: string;
+  onSavedId: (id: string) => void;
+  vaultLocked: boolean;
 }) {
   const t = useT();
   const [show, setShow] = useState(false);
+  const chosen = saved.find((p) => p.id === savedId);
   return (
     <div className={on ? "password-line on" : "password-line"}>
       <label className="check-row">
         <input type="checkbox" checked={on} onChange={(e) => onToggle(e.target.checked)} />
         <Icon name="lock" size={14} /> {t("Kopyayı parolayla koru")}
       </label>
-      {on && (
+      {on && saved.length > 0 && (
+        <select
+          className="password-saved"
+          value={savedId}
+          onChange={(e) => onSavedId(e.target.value)}
+          aria-label={t("Kayıtlı parola")}
+        >
+          <option value="">{t("Yeni parola yaz")}</option>
+          {saved.map((p) => (
+            <option key={p.id} value={p.id}>
+              {t("Kayıtlı: {ad}", { ad: p.name })}
+            </option>
+          ))}
+        </select>
+      )}
+      {on && chosen && (
+        <small>{t("Kopya kasadaki \"{ad}\" parolasıyla korunur. Parolayı alıcıya ayrı bir yoldan iletin.", { ad: chosen.name })}</small>
+      )}
+      {on && !chosen && (
         <>
           <span className="password-field">
             <input
@@ -2108,6 +2196,7 @@ function PasswordLine({
               ? t("Parola en az {n} karakter olmalı.", { n: MIN_PASSWORD })
               : t("Parolayı alıcıya ayrı bir yoldan (telefon, mesaj) iletin. Uygulama parolayı saklamaz.")}
           </small>
+          {vaultLocked && <small>{t("Kayıtlı parolaları kullanmak için kasanın kilidini açın (Ayarlar).")}</small>}
         </>
       )}
     </div>

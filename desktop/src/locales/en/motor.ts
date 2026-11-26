@@ -274,4 +274,12 @@ export default {
   "web adresinde bitişik yazılmış ad ve soyad": "a first name and surname written together in a web address",
   "web adresinde ad ve soyad": "a first name and surname in a web address",
   "web adresinde ad gibi duran bir parça": "a part of a web address that looks like a name",
+  "Parolaya bir ad verin (ör. Muhasebe)": "Give the password a name (e.g. Accounting)",
+  "Bu adla kayıtlı bir parola zaten var": "A password with this name is already saved",
+  "En çok {n} kopya parolası kaydedilebilir": "At most {n} copy passwords can be saved",
+  "Bu kayıtlı parola yok": "This saved password does not exist",
+  "Kopya parolası en az {n} karakter olmalı": "The copy password must be at least {n} characters",
+  "Kopya parolası en çok 128 karakter olabilir": "The copy password can be at most 128 characters",
+  "Ya kayıtlı parola seçin ya da yeni parola yazın, ikisi birden olmaz": "Either pick a saved password or type a new one, not both",
+  "Kayıtlı parolayı kullanmak için önce kasanın kilidini açın": "To use a saved password, first unlock the vault",
 } as Record<string, string>;

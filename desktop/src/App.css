@@ -4789,6 +4789,84 @@ mark.hl {
   font-size: 12.5px;
 }
 
+/* Kaydetme reddedildi (ör. kaçak tespiti): kaydet düğmesinin hemen altında, kullanıcının baktığı yerde. */
+.save-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--err);
+  border-radius: 10px;
+  background: var(--err-soft);
+  color: var(--err);
+  font-size: 13.5px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.save-error svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* Kayıtlı kopya parolası seçimi (kaydetme satırı) ve Ayarlar › Kopya parolaları */
+.password-saved {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.copy-passwords {
+  display: grid;
+  gap: 10px;
+}
+
+.copy-password-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.copy-password-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.copy-password-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.copy-password-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  user-select: all;
+}
+
+.copy-password-actions {
+  display: inline-flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.link-btn.danger {
+  color: var(--err);
+}
+
 .left-open {
   display: grid;
   gap: 6px;
@@ -8463,6 +8541,11 @@ mark.hl {
   color: var(--warn);
 }
 
+.history-table .res-kacakla {
+  color: var(--err);
+  font-weight: 600;
+}
+
 .history-actions {
   display: flex;
   flex-wrap: wrap;
@@ -8961,4 +9044,37 @@ mark.hl {
 /* Mavi (birincil) düğmede ilerleme çizgisi beyaz görünsün */
 .studio-apply-btn.primary.is-busy::before {
   background: rgba(255, 255, 255, 0.85);
+}
+
+/* Sorun bildir (Ayarlar) */
+.sorun-metni {
+  white-space: pre-wrap;
+  font-size: 12px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  user-select: text;
+}
+.sorun-eylemler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Kaçağa rağmen kaydetme */
+.save-error-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.save-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.save-error-confirm p {
+  margin: 0;
 }

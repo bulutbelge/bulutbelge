@@ -20,6 +20,12 @@ export interface VaultStatus {
   unlocked: boolean;
 }
 
+/** Kasadaki kayıtlı kopya (PDF) parolası: arayüze yalnızca kimlik ve ad gelir, değer gelmez. */
+export interface SavedPassword {
+  id: string;
+  name: string;
+}
+
 export interface SettingsData {
   profiles: Profile[];
   active: string;

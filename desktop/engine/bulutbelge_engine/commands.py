@@ -35,7 +35,7 @@ from bulutbelge_core.slides import slide_of_part, slide_preview
 from bulutbelge_core.word import MAX_BYTES as WORD_MAX_BYTES, WORD_EXTS
 from bulutbelge_core.detect import PatternTimeout, detect
 from bulutbelge_core.pseudonym import Pseudonyms
-from bulutbelge_core.rules import DATA_TYPES, RuleError, Rules, describe_types
+from bulutbelge_core.rules import DATA_TYPES, RuleError, Rules, describe_types, kacak_izni
 
 from . import journal, settings
 from .protocol import EngineError
@@ -306,20 +306,44 @@ def _doc_scan_body(params: dict[str, Any], path: str) -> dict[str, Any]:
 
 
 def doc_mask(params: dict[str, Any]) -> dict[str, Any]:
-    """Maskeli kopyayı yerelde üretir ve günlüğe yazar."""
+    """Maskeli kopyayı yerelde üretir ve günlüğe yazar.
+
+    `accept_leak: true` (yalnızca masaüstü arayüzü, kullanıcı onayından sonra): kaçak denetimi değer bulsa da
+    kopya yazılır; kalan türler yanıtta `leaked` olarak döner, günlüğe "kacakla" sonucuyla türleriyle girer
+    (değer yazılmaz). Ajan yolu (komut satırı, MCP) `_doc_mask_checked`'i kendi kurduğu parametrelerle çağırır,
+    bu alanı geçirmez. Aktif içerik (makro vb.) ve diğer hatalar bu izinle aşılmaz.
+    """
     source = _require_str(params, "source")
     purpose = _purpose(params)
+    accept = params.get("accept_leak")
+    if accept is not None and not isinstance(accept, bool):
+        raise EngineError("invalid_params", "'accept_leak' doğru/yanlış olmalı")
     result = journal.run(
         "maskeleme",
-        lambda: _doc_mask_checked(params),
+        (lambda: _doc_mask_accepting_leak(params)) if accept else (lambda: _doc_mask_checked(params)),
         source=source,
         profile=journal.profile_of(params),
         counts_of=lambda r: r.get("counts") or {},
         target_of=lambda r: r["target"],
         purpose=purpose,
+        result_of=lambda r: ("kacakla", "kacak:" + ",".join(r["leaked"])) if r.get("leaked") else ("basarili", None),
     )
     if params.get("report"):
         result["report"] = _write_report(params, source, purpose, result)
+    return result
+
+
+def _doc_mask_accepting_leak(params: dict[str, Any]) -> dict[str, Any]:
+    with kacak_izni() as kalan:
+        result = _doc_mask_checked(params)
+    if kalan:
+        turler = sorted(set(kalan))
+        result["leaked"] = turler
+        adlar = ", ".join(DATA_TYPES[k].label if k in DATA_TYPES else k for k in turler)
+        result["warnings"] = [
+            *(result.get("warnings") or []),
+            f"Kaçağa rağmen kaydedildi: maskelenmesi gereken değerler kopyada hâlâ okunuyor ({adlar}). Paylaşmadan önce kopyayı kontrol edin.",
+        ]
     return result
 
 
@@ -416,7 +440,7 @@ def _doc_mask(params: dict[str, Any]) -> dict[str, Any]:
         raise EngineError("invalid_params", "Satır ve sütun seçimi yalnızca Excel için")
     _line_pseudonyms(rules, cells)
     if kind in DOC_MASKERS:
-        if params.get("password"):
+        if params.get("password") or params.get("password_id"):
             raise EngineError("invalid_params", "Parolayla koruma yalnızca PDF için")
         counts: dict[str, int] = {}
         extra = {"manual_cells": cells} if cells else {}
@@ -440,7 +464,7 @@ def _doc_mask(params: dict[str, Any]) -> dict[str, Any]:
         manual_areas=_manual_areas(params.get("manual_areas")),
         make_dirs=bool(params.get("make_dirs")),
         drop_pages=_drop_pages(params.get("drop_pages")),
-        password=_password(params.get("password")),
+        password=_copy_password(params),
         counts=counts,
         watermark=_watermark(params, source),
         flatten=bool(params.get("flatten")),
@@ -487,6 +511,22 @@ def _line_pseudonyms(rules: Rules, cells: list[tuple]) -> None:
         if not settings.VAULT.unlocked:
             raise EngineError("vault_locked", "Takma ad yöntemi için önce özel ifade kasasının kilidini açın")
         rules.pseudonyms = Pseudonyms(settings.VAULT.pseudonyms, rules.pseudonym_per_document)
+
+
+def _copy_password(params: dict[str, Any]) -> str | None:
+    """Kopyanın parolası: ya o seferlik yazılan (`password`) ya da kasadaki kayıtlı parolanın kimliği
+    (`password_id`; değer kasadan burada alınır, arayüze dönmez). İkisi birlikte verilemez. Ajan yolu
+    (komut satırı, MCP) bu alanları hiç geçirmez: kayıtlı parolalar yalnızca arayüzden kullanılır."""
+    pid = params.get("password_id")
+    if pid in (None, ""):
+        return _password(params.get("password"))
+    if params.get("password"):
+        raise EngineError("invalid_params", "Ya kayıtlı parola seçin ya da yeni parola yazın, ikisi birden olmaz")
+    if not isinstance(pid, str):
+        raise EngineError("invalid_params", "'password_id' metin olmalı")
+    if not settings.VAULT.unlocked:
+        raise EngineError("vault_locked", "Kayıtlı parolayı kullanmak için önce kasanın kilidini açın")
+    return settings.VAULT.password_value(pid)
 
 
 def _password(raw: Any) -> str | None:
@@ -780,6 +820,36 @@ def vault_pseudonym_restore_text(params: dict[str, Any]) -> dict[str, Any]:
 
 def vault_pseudonym_clear(_params: dict[str, Any]) -> dict[str, Any]:
     return journal.setting_change("takma adları silme", settings.VAULT.pseudonym_clear)
+
+
+def vault_passwords(_params: dict[str, Any]) -> dict[str, Any]:
+    """Kayıtlı kopya parolalarının adları (değer yok)."""
+    return settings.VAULT.passwords()
+
+
+def vault_password_add(params: dict[str, Any]) -> dict[str, Any]:
+    """Günlüğe yalnızca "kopya parolası ekleme" girer; ad ve değer yazılmaz."""
+    return journal.setting_change(
+        "kopya parolası ekleme", lambda: settings.VAULT.password_add(params.get("name"), params.get("value"))
+    )
+
+
+def vault_password_update(params: dict[str, Any]) -> dict[str, Any]:
+    return journal.setting_change(
+        "kopya parolası değiştirme",
+        lambda: settings.VAULT.password_update(params.get("id"), params.get("name"), params.get("value")),
+    )
+
+
+def vault_password_delete(params: dict[str, Any]) -> dict[str, Any]:
+    return journal.setting_change("kopya parolası silme", lambda: settings.VAULT.password_delete(params.get("id")))
+
+
+def vault_password_reveal(params: dict[str, Any]) -> dict[str, str]:
+    """Kullanıcı alıcıya iletmek için değeri ister ("Göster" ya da "Kopyala"). Günlüğe ad ve değer yazılmaz."""
+    return journal.setting_change(
+        "kopya parolasını görüntüleme", lambda: {"value": settings.VAULT.password_value(params.get("id"))}
+    )
 
 
 def vault_delete(_params: dict[str, Any]) -> dict[str, bool]:

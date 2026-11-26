@@ -29,7 +29,7 @@ from pathlib import Path
 from .gecici import klasor_ac
 from .detect import Finding
 from .pdf import PdfError, count_types, unique_path
-from .rules import Rules, kacak_iletisi
+from .rules import Rules, kacak_iletisi, kacak_kabul
 from .textdoc import _scan_text
 
 EML_EXTS = {".eml"}
@@ -417,7 +417,7 @@ def _verify_output(data: bytes, w: _Walker) -> None:
             v = _normalize(f.finding.value)
             if v and v not in _normalize(f.replacement) and v in hay:
                 leaked.append(f.finding.type)
-    if leaked:
+    if leaked and not kacak_kabul(leaked):
         raise PdfError(kacak_iletisi(leaked))
 
 

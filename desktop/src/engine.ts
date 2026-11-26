@@ -1,14 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
+import { hataKaydet } from "./SorunBildir";
 
-/** Python motoruna istek gönderir. Hata durumunda motorun mesajıyla reddeder. */
-export function engineCall<T>(method: string, params?: Record<string, unknown>): Promise<T> {
-  return invoke<T>("engine_call", { method, params }).catch((err) => {
-    const msg = String(err);
-    if (msg.includes("motor beklenmedik") || msg.includes("motora yazılamadı")) {
-      return invoke<T>("engine_call", { method, params });
-    }
-    throw err;
-  });
+/**
+ * Python motoruna istek gönderir. Hata durumunda motorun mesajıyla reddeder.
+ * Hata, "Sorun bildir" metni için bellekte tutulur (yollar ve e-postalar silinerek); `kaydet` false ise tutulmaz.
+ */
+export function engineCall<T>(method: string, params?: Record<string, unknown>, kaydet = true): Promise<T> {
+  return invoke<T>("engine_call", { method, params })
+    .catch((err) => {
+      const msg = String(err);
+      if (msg.includes("motor beklenmedik") || msg.includes("motora yazılamadı")) {
+        return invoke<T>("engine_call", { method, params });
+      }
+      throw err;
+    })
+    .catch((err) => {
+      if (kaydet) hataKaydet(method, err);
+      throw err;
+    });
 }
 
 export interface EngineVersion {
@@ -168,4 +177,6 @@ export interface MaskResult {
   encrypted?: boolean;
   /** Kaydedilen yol seçilenden farklıysa nedeni (var olan dosya, uzantı) */
   changed?: string | null;
+  /** Kaçağa rağmen kaydedildiyse kopyada açık kalan türler (değer değil) */
+  leaked?: string[];
 }

@@ -43,7 +43,7 @@ from .loose import find_split_cells
 from .pdf import OcrUnavailable, PdfError, _normalize, count_types, ocr_refusal, unique_path
 from .names import initials, name_hints
 from . import tablo
-from .rules import BLACKOUT, BLUR, INITIALS, KEEP_LAST4, LABEL, PSEUDONYM, Rules, kacak_iletisi
+from .rules import BLACKOUT, BLUR, INITIALS, KEEP_LAST4, LABEL, PSEUDONYM, Rules, kacak_iletisi, kacak_kabul
 from .validators import digits_only
 
 MAX_BYTES = 50 * 1024 * 1024
@@ -1526,7 +1526,7 @@ def verify(
     if kalan:
         raise PdfError(f"Aktif içerik kaldı ({', '.join(kalan[:3])}). Dosya yazılmadı.")
     leaked = [tur for v, tur in must_be_gone.items() if v and v in text]
-    if leaked:
+    if leaked and not kacak_kabul(leaked):
         raise PdfError(kacak_iletisi(leaked, "belgenin başka bir yerinde (gizli alan, bağlantı, formül, özellik)"))
 
 

@@ -2,7 +2,7 @@
 
 BulutBelge; PDF, Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), fotoğraf/görsel (`JPG, PNG, TIFF, BMP, WEBP`), ZIP arşivi (`.zip`) ve metin/veri (`XML` [imzalı e-Fatura UBL dahil], `CSV`, `JSON`, `TXT`, `LOG`, `MD`, `TSV`, `INI`, `YAML`) belgelerindeki kişisel ve ticari verileri (TC kimlik, VKN, MERSİS, ticaret sicil, kurum unvanı, vergi dairesi, IBAN, banka/şube, ETTN/e-imza, telefon, e-posta, ad soyad, adres, tutar, doğum tarihi, plaka, imza/kaşe/QR, fotoğraftaki yüz…) tespit eder, önizlemede size gösterir ve onayınızla **gerçekten silerek** güvenli bir kopya kaydeder.
 
-> **Temel Güvenlik Sözü:** Masaüstü uygulamasında tüm işlemler %100 bilgisayarınızda (çevrimdışı) gerçekleşir; hiçbir belge veya veri dışarıya gönderilmez ve orijinal dosyalarınıza asla dokunulmaz. Masaüstü uygulaması hiçbir API'yi ve kurum sunucusunu kullanmaz, hesap istemez. Kurumlar için ayrı bir sunucu sürümü vardır, masaüstü ona bağlanmaz ([12. bölüm](#12-yönetim-paneli-panelbulutbelgecom)).
+> **Temel Güvenlik Sözü:** Masaüstü uygulamasında tüm işlemler %100 bilgisayarınızda (çevrimdışı) gerçekleşir; hiçbir belge veya veri dışarıya gönderilmez ve orijinal dosyalarınıza asla dokunulmaz. Masaüstü uygulaması hiçbir API'yi ve kurum sunucusunu kullanmaz, hesap istemez. Kurumlar için ayrı bir sunucu ürünü vardır; masaüstü ona bağlanmaz ve bu kılavuz onu anlatmaz.
 
 ---
 
@@ -19,8 +19,7 @@ BulutBelge; PDF, Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), fotoğra
 9. [Uygulama Neyi Garanti Eder, Neyi Etmez?](#9-uygulama-neyi-garanti-eder-neyi-etmez)
 10. [Örnek Test Belgeleriyle Deneme](#10-örnek-test-belgeleriyle-deneme)
 11. [Sık Karşılaşılan Sorunlar ve Çözümleri](#11-sık-karşılaşılan-sorunlar-ve-çözümleri)
-12. [Yönetim Paneli (panel.bulutbelge.com)](#12-yönetim-paneli-panelbulutbelgecom)
-13. [Uygulamayı Kaldırmak](#13-uygulamayı-kaldırmak)
+12. [Uygulamayı Kaldırmak](#12-uygulamayı-kaldırmak)
 
 ---
 
@@ -131,7 +130,7 @@ BulutBelge **körlemesine otomatik maskeleme yapmaz**; her zaman şu 4 adımı i
 - Sağ paneldeki **`1. Adım — Maskeleme Kuralı`** kartından kullanmak istediğiniz kural takımını seçin:
   - **Varsayılan**
   - **Müşteriye** *(Kişiyi tanıtan her şey maskelenir)*
-  - **Denetçiye** *(Baş harfler, son 4 hane, il/ilçe gibi iz sürülebilir kısmi maskeleme)*
+  - **Denetçiye** *(Baş harfler, son 4 hane, il/ilçe gibi iz sürülebilir kısmi maskeleme; tutarlar `10.000-100.000` gibi aralığa çevrilir, tablodaki para birimsiz tutarlar dahil)*
   - **Kurum içine** *(Yalnızca kimlik ve banka/hesap numaraları maskelenir)*
   - **e-Fatura** *(GİB e-Fatura/e-Arşiv PDF, imzalı UBL XML ve `.zip` paketleri için: alıcı/satıcı kurum unvanı, adres, vergi dairesi, VKN/TCKN, MERSİS, ticaret sicil, banka/IBAN, tutar, ETTN/e-imza ve QR karekod maskelenir)*
 - **`Uygula`** (klasör/çoklu belgede **`Tüm Belgelere Uygula (N belge)`**) butonuna basın. Tarama sürerken ortada belge animasyonu ve (çoklu belgede) ilerleme şeridi görünür.
@@ -184,7 +183,7 @@ Bir klasör seçtiğinizde BulutBelge klasörü kör bir toplu işlem ekranına 
 | **`− %100 +`** | Belge önizleme üst çubuğu | Belgeyi yakınlaştırır veya uzaklaştırır; yüzde değerine tıklayınca sayfaya sığdırır. |
 | **`Alan seç`** | PDF ve fotoğraf önizlemesi | Fareyle kutu çizerek imza, kaşe veya özel alanı karartmaya ekler. |
 | **`Bu sayfayı kopyadan çıkar`** | PDF önizlemesi ve sol Sayfa Gezgini | Kimlik fotokopisi gibi tamamen çıkarılması gereken sayfaları kaydedilecek PDF kopyasından siler. |
-| **`Kopyayı parolayla koru`** | Sağ alt kaydetme alanı (PDF) | Kaydedilen PDF kopyasını AES-256 parolasıyla şifreler. |
+| **`Kopyayı parolayla koru`** | Sağ alt kaydetme alanı (PDF) | Kaydedilen PDF kopyasını AES-256 parolasıyla şifreler. Kasa açıksa listeden kayıtlı bir parola (`Kayıtlı: Muhasebe`) seçilebilir ya da o seferlik yeni parola yazılır. |
 | **Word önizlemesi** | Orta panel (`.docx`) | Belge Word'deki gibi çizilir ama uygulamadan yalıtılmıştır: belgenin stilleri uygulamanın görünümünü değiştiremez, belgedeki bağlantılar önizlemede tıklanmaz (adres açılmaz). |
 | **`Metin Yapıştır`** | Ana ekran üst sekmesi | Dosya olmadan e-posta, not veya ChatGPT/Claude'a gönderilecek metinleri bellekte temizleyip panoya kopyalar. |
 
@@ -223,6 +222,7 @@ Sağ üstteki **`Ayarlar`** butonuna tıklayarak kural takımlarını ve uygulam
 - **Excel'de satır ya da sütunun tamamını maskelemek:** "Uygula"dan sonra tablo önizlemesinde sütun harfine (A, B, C…) ya da satır numarasına tıklayın; o sütunun ya da satırın bütün dolu hücreleri "Elle seçilen alan" olarak maskelenir (önizlemede görünmeyen satırlar dahil). Tablonun üstünde seçtiğiniz satır ve sütunlar listelenir; her birinin yanından yöntemi seçebilirsiniz: Karartma, Etiket, Son 4 hane açık, Baş harfler ya da Takma ad (aynı değer her yerde aynı "Değer-3" olur; kasanın açık olması gerekir). Bir hücre hem seçilen satırda hem seçilen sütundaysa daha sıkı yöntem uygulanır. İkinci tıklama ya da listedeki × seçimi kaldırır. Değer ve formül dosyadan gerçekten silinir. O hücrelere başvuran formüllerin son hesaplanan değerleri başka hücrelerde kalabilir; uygulama bunu uyarır.
 - **Ajan erişimi (Alt Bölüm):** Yapay zekâ ajanının BulutBelge'yi komut satırından kullanabileceği klasörleri, maskeli kopya yazma iznini ve ajanın kural takımını buradan belirlersiniz. Ajan için seçtiğiniz kural takımı (seçmezseniz etkin takım) **üst sınırdır**: ajan komutta `--profil` ile yalnızca bu takımı ya da ondan sıkısını seçebilir; bu takımın maskelediği bir türü açık bırakan (ör. adları açık bırakan "Kurum içine") ya da beyaz listesi daha geniş olan takım reddedilir ve işlem günlüğüne "reddedildi" olarak yazılır. Bu bölüm `Kaydet` beklemeden hemen kaydedilir. Ayrıntı ve ajana verilecek hazır yönerge: `docs/AJAN-KOMUT-SATIRI.md`. **`Ajan yönergesini kopyala`** düğmesinin verdiği yönerge ajana, kişisel veri içerebilecek bir belgede önce `bulutbelge scan` ile değer görmeden bakmasını ve size maskeli okumayı önermesini söyler. Claude Code için hazır beceri: `bulutbelge kilavuz --skill` çıktısını `~/.claude/skills/bulutbelge/SKILL.md` olarak kaydedin; Cursor ve Codex için `bulutbelge kilavuz --yonerge` çıktısını projedeki `AGENTS.md` dosyasına ekleyin.
 - **Hakkında ve koşullar (Alt Bölüm):** Kullanım koşullarının özeti, tam metnin bağlantısı ve **`Kullanım kılavuzu`** bağlantısı (bu belge; bulutbelge.com/belgeler sayfası tarayıcıda açılır, uygulama hiçbir veri göndermez).
+- **Sorun bildir (Alt Bölüm):** Hata ya da öneri için **`E-posta ile bildir`** düğmesi, e-posta programınızda `info@bulutbelge.com` adresine hazır bir taslak açar; gönderen sizsiniz, uygulama kendisi hiçbir şey göndermez. Taslağa gidecek metin önce ekranda gösterilir: uygulama ve motor sürümü, işletim sistemi ve bu oturumdaki son hata iletisi. Hata iletisindeki dosya yolları, belge adları ve e-posta adresleri silinir; belge içeriği ve kural takımı eklenmez. **`Metni kopyala`** metni panoya alır (e-posta programı yoksa), **`GitHub'da bildir`** açık depodaki sorun sayfasını açar. Belgenizi eklemeyin; örnek gerekiyorsa yalnızca içine bakıp emin olduğunuz maskeli kopyayı ekleyin.
 - **İşlem günlüğü (Alt Bölüm):** Uygulamadan ya da ajandan önizlenen, taranan, maskelenen ve dışa aktarılan her belge ile her takma ad geri çevirme (maske kaldırma) tarih, dosya, işlem ve çağırana göre süzülerek listelenir. **`Zinciri denetle`** sonradan değiştirilen ya da silinen kaydı bulur; **`CSV olarak dışa aktar`** süzülen kayıtları Excel'de açılabilir dosyaya yazar. Günlükte bulunan değerler ve belge içeriği yoktur, yalnızca tür bazında sayılar. Dosya yolu yer alır, ama klasör ve dosya adlarındaki kişi adı ve diğer kişisel veriler (ör. `Ayşe Yılmaz/kira_12345678950.pdf` → `[AD SOYAD]/kira_█████.pdf`) yazılmadan önce maskelenir. Güvenlik ayarlarındaki değişiklikler de **Ayar değişikliği** olarak günlüğe girer: ajan erişimi (klasör sayısı ve izinler, klasör yolu değil), istisna ekleme ve silme, kasa oluşturma, terimler, parola değiştirme ve silme, takma adları silme, kural takımları, son yapılanları temizleme. Değer, terim ve parola yazılmaz. Günlük yazılamıyorsa ayar da değişmez.
   - **Anahtarlı mühür:** Her kayıt, bu bilgisayarda ilk kullanımda üretilen rastgele bir anahtarla mühürlenir (HMAC-SHA256). Anahtar günlükten ayrı bir dosyadadır: ayar klasöründe `gunluk-anahtari.json` (macOS ve Linux'ta yalnızca sizin okuyabileceğiniz izinle; Windows'ta `%APPDATA%` klasörü zaten kullanıcıya özeldir). İsterseniz `BULUTBELGE_JOURNAL_KEY_FILE` ortam değişkeniyle başka bir yere (ör. ayrı bir sürücü) koyabilirsiniz. Günlük dosyasını değiştirip zinciri baştan hesaplayan biri anahtarı bilmeden mührü tutturamaz; `Zinciri denetle` bunu "Kayıt mührü (HMAC) tutmuyor" diye bildirir. Bu, dosyaya yazabilen ama anahtarı okuyamayan kişiye karşı korur; bilgisayarınızda sizin hesabınızla her şeyi okuyabilen biri anahtarı da okuyabilir.
   - **Eski günlükler:** Önceki sürümlerin yazdığı mühürsüz kayıtlar okunur ve zincirle doğrulanır; denetim "N kayıt, zincir sağlam (M eski kayıt mühürsüz)" der. Anahtar üretildikten sonra mühürsüz kayıt kabul edilmez.
@@ -235,6 +235,7 @@ Sağ üstteki **`Ayarlar`** butonuna tıklayarak kural takımlarını ve uygulam
 - **Özel İfadeler Kasası:** Kurumunuza özel müşteri, kişi veya gizli proje adlarını **AES-256** ile şifrelenmiş yerel kasada saklayabilirsiniz.
 - **Tutarlı Takma Ad (`Kişi-1`, `TC-1`, `Kurum-1`, `ETTN-1`):** Bir veri türünün yöntemini `Takma ad` yaptığınızda, aynı kişi veya kurum/fatura verisi belgenin her yerinde ve farklı belgelerde tutarlı olarak aynı takma adı alır (ör. `Ayşe Yılmaz` → her yerde `Kişi-1`, VKN → `VKN-1`, tutar → `Tutar-1`, fatura ETTN → `ETTN-1`).
 - Eşleme tablosu yalnızca şifreli kasada tutulur; yetkili kişi **Ayarlar → Gelişmiş Ayarlar → Takma adlar** bölümünden kasa kilidini açarak `Kişi-1` kodunun gerçek değerini sorgulayabilir.
+- **Kopya parolaları:** Aynı alıcıya giden PDF kopyalarda hep aynı parolayı kullanıyorsanız **Ayarlar → Gelişmiş Ayarlar → Kopya parolaları** bölümünde ona bir ad verip (ör. `Muhasebe`, `Denetçi firma`) kasaya kaydedin. Kaydederken `Kopyayı parolayla koru` işaretlenince listeden adıyla seçilir; parolanın kendisi ekrana gelmez. Alıcıya iletmek için aynı bölümde **`Göster`** ya da **`Kopyala`** kullanılır (kopyalanan parola 30 saniye sonra panodan silinir). Parolalar kasada şifreli durur; kasa kilitliyken kullanılamaz, kasa parolası değişince yeni anahtarla yeniden şifrelenir, kasa silinirse onlar da silinir. Ekleme, değiştirme, gösterme ve silme işlem günlüğüne ad ve değer olmadan **Ayar değişikliği** olarak girer. Kayıtlı parolalar yalnızca uygulamanın arayüzünden kullanılır; ajan komutu ve MCP bunlarla parolalı kopya üretemez.
 
 ---
 
@@ -267,37 +268,13 @@ Uygulamada **`Klasör seç`** diyerek `BulutBelge-Test-Belgeleri` klasörünü s
 |---|---|
 | **`Port 1420 is already in use`** | Uygulama zaten arka planda çalışıyordur. Açık olan BulutBelge penceresini kullanın veya önceki terminali kapatıp yeniden başlatın. |
 | **`OCR dil dosyaları kurulu değil`** / **`OCR kullanılamıyor (kurulum bozuk olabilir)`** | OCR uygulamayla gelir; bu uyarı kurulumun bozuk olduğunu gösterir. Metin katmanı olmayan (taranmış) sayfa ya da görsel maskelenecekse uygulama **maskeli kopyayı yazmaz**, çünkü o sayfadaki kişisel veri bulunamaz ve kopyada açık kalırdı (tarama uyarıyla devam eder; sayfayı "maskelenmesin" dediğiniz ya da kopyadan çıkardığınız durumda yazılır). Uygulamayı yeniden kurun. Geliştirme ortamında `engine/.venv/bin/python engine/tessdata_indir.py` (Windows'ta `Scripts\python`) komutunu çalıştırın. |
-| **`Kaçak tespiti … Dosya yazılmadı`** | Maskelenmesi seçilen bir değer dosyanın iç yapısında kaldığı için güvenlik gereği çıktı engellenmiştir. İletideki parantez, kalan değerlerin türlerini söyler (ör. `(Adres)`); değerin kendisi gösterilmez. O türdeki bulguları ve belgede aynı değerin geçtiği başka yerleri kontrol edin. Office'te belge özelliklerindeki parça adlarında (`TitlesOfParts`: ör. Excel sayfa adı) bulunan bir değer sayfa sekmesinde de duruyorsa da bu hata çıkar; sayfayı yeniden adlandırıp tekrar deneyin. |
+| **`Kaçak tespiti … Dosya yazılmadı`** | Maskelenmesi seçilen bir değer dosyanın iç yapısında kaldığı için güvenlik gereği çıktı engellenmiştir. İletideki parantez, kalan değerlerin türlerini söyler (ör. `(Adres)`); değerin kendisi gösterilmez. O türdeki bulguları ve belgede aynı değerin geçtiği başka yerleri kontrol edin. Office'te belge özelliklerindeki parça adlarında (`TitlesOfParts`: ör. Excel sayfa adı) bulunan bir değer sayfa sekmesinde de duruyorsa da bu hata çıkar; sayfayı yeniden adlandırıp tekrar deneyin. İleti kaydet düğmesinin hemen altında ve üstteki uyarı şeridinde görünür. Klasörü ya da birden çok belgeyi birlikte kaydederken reddedilen belge diğerlerini durdurmaz; diğerleri kaydedilir ve reddedilenler dosya adlarıyla listelenir. **Yine de kaydetmek isterseniz:** iletinin altındaki **`Yine de kaydet`** düğmesine basın; açık kalacak türler ve paylaşım riski yeniden gösterilir, **`Evet, kaçağa rağmen kaydet`** ile onaylarsanız kopya yazılır. Sonuç ekranı bu durumda "Güvenli kopya hazır" demez, açık kalan tür sayısını söyler; işlem günlüğünde kayıt **Kaçağa rağmen kaydedildi** sonucuyla ve kalan türlerle (değer değil) görünür. Bu seçenek yalnızca tek belgede vardır: toplu kaydetmede reddedilen belgeyi açıp kontrol ettikten sonra tek başına kaydedin. Ajan komutu ve MCP bu seçeneği kullanamaz. Makro gibi etkin içerik kaldığında (`Aktif içerik kaldı`) ya da dosya okunamadığında yine de kaydetme yoktur. |
+| **Uygulama beklenmedik bir hata veriyor** | Ayarlar → **Sorun bildir** ile hazır e-posta taslağını açın; sürüm ve son hata iletisi taslağa kendiliğinden eklenir. Ne yaptığınızı birkaç cümleyle yazıp gönderin. |
 | **`Takma ad yöntemi için kasanın kilidini açın`** | Ayarlar → Gelişmiş Ayarlar → Özel ifadeler bölümünden kasa parolanızı girerek kilidi açın. |
 
 ---
 
-## 12. Yönetim Paneli (panel.bulutbelge.com)
-
-> Bu bölüm masaüstü uygulaması için değil, kurumun kendi sunucu sürümü içindir (şu an yalnızca Proteksistem içi test ve geliştirme). Masaüstü uygulaması dosyayı dışarı göndermez, hiçbir API'yi kullanmaz ve yönetim paneline bağlanmaz. Yönetim paneli, sunucu sürümündeki işlemleri izlemek ve ayarları görmek içindir.
->
-> Sunucudaki işlemler kullanıcı girişi (Authentik OIDC veya yerel kullanıcı) ve yöneticinin açtığı API anahtarlarıyla (`bb_`) yetkilendirilir; panel yalnızca ofis ağından açılır. 16 Kasım 2026 kararı gereği orijinal belgeler ve sayfa önizlemeleri sunucuda saklanmaz; yalnızca geçici maskeli çıktı (en fazla `60 dk`), çift yönlüyse şifreli eşleme (`esleme.enc`) ve PostgreSQL maskeleme kaydı (dosya adı olmadan) tutulur.
-
-Sol menüden sayfa seçilir; sağ üstteki **`Yenile`** verileri tazeler. Sol altta ortam (Geliştirme / Üretim), sunucu sürümü ve **Açık / Koyu** tema anahtarı vardır.
-
-| Sayfa | Ne gösterir ve ne yapar |
-|---|---|
-| **İşlem günlüğü** | Sunucudaki ve bağlı istemcilerdeki her tarama, maskeleme, maske çözme, reddetme ve yönetim olayı: zaman, çalışan/kim (`X-BB-Calisan` dahil), işlem, belge uzantısı, kural takımı, amaç, tür bazında bulgu sayıları, sonuç. Tarih aralığı, işlem, sonuç ve kural takımına göre süzülür; **`CSV`** dışa aktarır, üstte SHA-256 **zincir sağlamlığı** görünür. Değer ve belge içeriği yoktur. |
-| **Görüntüleme istekleri** | Bağlı uygulamaların tek alan maske çözme istekleri ayrı sekmede: uygulama, çalışan, kayıt, alan, amaç ve sonuç (izin verildi / reddedildi / sınır aşıldı); çözülen değer görünmez. Süzülür ve CSV olarak dışa aktarılır. |
-| **Belgeler** | Tarayıcıdan tekil veya toplu (`.pdf`, `.docx`, `.xlsx`, `.xml`, `.zip` vb.) belge yükleme, kural takımı seçimi, geçici maskeli kopyayı indirme, çift yönlü işlemlerde yetkili insanın gerekçeli (**`amac >= 3` karakter**) maske çözmesi, olay geçmişi ve kayıt silme. |
-| **Sunucu ve bağlantı** | PostgreSQL, Redis/RQ kuyruğu, kasa, güvenlik kontrolleri ve bağlı istemcilerin durumu. |
-| **Kural takımları** | Hazır takımlar (`Varsayılan`, `Müşteriye`, `Denetçiye`, `Kurum içine`, `e-Fatura`) ve kuruma özel kural takımları: yöneticiler hangi bilgi türünün maskeleneceğini ve yöntemini (`Takma ad` dahil) doğrudan panelden düzenleyip sunucuya (`kural-takimlari.json`) kaydeder. |
-| **API anahtarları** | Otomasyon, MCP veya entegrasyonlar için `bb_` API anahtarı oluşturma (`tara`, `maskele` ve izinli kural takımları seçilerek), kullanım sayısı görme ve iptal etme. (`bb_` anahtarlarıyla maske çözme reddedilir → `403`.) |
-| **API'yi dene** | Tarayıcı içinden canlı metin/belge tarama, maskeleme ve geri çevirme denemesi. |
-| **Ayarlar & Kullanıcılar** | Azami dosya boyutu, geçici maskeli çıktı süresi (`sonuc_suresi_dk`, `0` = en fazla `60 dk`), uçların açık/kapalı durumu ve yönetici/denetçi kullanıcı rolleri. |
-
-**Sorunlar:** "Sunucudan veri alınamadı" uyarısı çıkarsa sunucu kapalıdır ya da ağa ulaşılamıyordur; sistem yöneticisine bildirin. Sol menüde **Sistem**'in yanında kırmızı sayı varsa ulaşılamayan bileşen vardır.
-
-Sağ üstteki **`Yardım`** düğmesi panel, API, sunucu kurulumu ve işletme belgelerini yeni sekmede açar (panel içinde `/yardim/`, yalnızca ofis ağından). Tanıtım ve indirme sayfası: bulutbelge.com (`site/`).
-
----
-
-## 13. Uygulamayı Kaldırmak
+## 12. Uygulamayı Kaldırmak
 
 Windows'ta uygulama iki paketle dağıtılır; kaldırma davranışı farklıdır.
 

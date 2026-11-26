@@ -61,13 +61,18 @@ _LABEL_LINE = re.compile(
     r"|TEL(?:EFON)?|FAKS|FAX|WEB|E-?POSTA|SENARYO|FATURA\s+(?:NO|T[İI]P[İI]|TAR[İI]H[İI])"
     r"|ETTN|BANKA\s+HESAP|ÖDEME|IBAN|E-?FATURA|[ÖO]ZELLE[ŞS]T[İI]RME|MAL\s*/?\s*H[İI]ZMET)\b\s*:?"
 )
+# Yalnızca bir alan etiketinden oluşan değer ("Kodu", "No", "Adı") vergi dairesi adı olamaz; tablo
+# başlıklarında etiket ile değer ayrı hücrelerde durduğunda kalıp etiketi değer sanmasın.
+_LABEL_ONLY = re.compile(r"(?i)^\s*(?:kodu?|no|numaras[ıi]|ad[ıi]|kimlik|bilgisi)\s*$")
+
 _HEADER_STOP = re.compile(
     r"(?i)^\s*(?:VERG[İI]\s+DA[İI]RES[İI]|V\.?D\.?|VKN|TCKN|TEL(?:EFON)?|FAKS|FAX|WEB|E-?POSTA"
     r"|MERS[İI]S|T[İI]CARET\s+S[İI]C[İI]L|SENARYO|FATURA|ETTN|BANKA|IBAN|SAYIN)\b"
 )
 
+# "V.D. Kodu" / "Vergi Dairesi Kodu" başlığı vergi dairesi adı değildir (kod sayısaldır): bu etiket atlanır.
 _VD_RE = re.compile(
-    r"(?i)(?<![\w])(?:Vergi\s+Dairesi|V\.?D\.?)(?!\s*(?:No|Numaras[ıi]))\s*[:.\-]?\s*"
+    r"(?i)(?<![\w])(?:Vergi\s+Dairesi|V\.?D\.?)(?!\s*(?:No|Numaras[ıi]|Kodu?\b))\s*[:.\-]?\s*"
     r"([^\r\n:;|]{2,55}?)(?=\s+(?:VKN|TCKN|Vergi\s*(?:No|Kimlik|Numaras[ıi])|Tel|Faks|Fax|E-?Posta|Web|Mersis|Ticaret)\b|[;\r\n]|$)"
 )
 _TS_RE = re.compile(
@@ -150,7 +155,7 @@ def find_efatura_text_findings(text: str, enabled: Callable[[str], bool]) -> lis
         for m in _VD_RE.finditer(text):
             s, e = _trim_span(text, m.start(1), m.end(1))
             val = text[s:e].strip(" .:-")
-            if e > s and re.search(r"[A-Za-zÇĞİÖŞÜçğıöşü]{2}", val) and not _HEADER_STOP.match(val):
+            if e > s and re.search(r"[A-Za-zÇĞİÖŞÜçğıöşü]{2}", val) and not _HEADER_STOP.match(val) and not _LABEL_ONLY.match(val):
                 e = s + len(val)
                 out.append(Finding("vergi_dairesi", s, e, val, HIGH))
 

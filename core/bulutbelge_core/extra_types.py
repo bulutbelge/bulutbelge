@@ -382,9 +382,21 @@ _AMOUNT = re.compile(
 )
 
 
+# Para birimi yazılmamış tablo tutarı: satırda yalnızca Türk biçiminde, tam iki ondalıklı sayı
+# ("939,70", "44.468,17"). Dekont ve tahsilat tablolarında tutar sütunu böyle çıkar. Tarih
+# ("24.11.2026") ve kodlar ("1048") eşleşmez.
+_BARE_AMOUNT_LINE = re.compile(r"(?m)^[^\S\r\n]*(\d{1,3}(?:\.\d{3})*,\d{2})[^\S\r\n]*$")
+
+
 def find_amounts(text: str) -> Iterator[tuple[int, int]]:
+    seen: list[tuple[int, int]] = []
     for m in _AMOUNT.finditer(text):
+        seen.append((m.start(), m.end()))
         yield m.start(), m.end()
+    for m in _BARE_AMOUNT_LINE.finditer(text):
+        s, e = m.span(1)
+        if not any(a < e and s < b for a, b in seen):
+            yield s, e
 
 
 def _amount_number(value: str) -> float:
@@ -407,13 +419,15 @@ def _amount_number(value: str) -> float:
 
 
 def amount_range(value: str) -> str:
-    cur = re.search(_CUR, value).group()
+    m = re.search(_CUR, value)
+    cur = m.group() if m else ""  # birimsiz tablo tutarı: aralık birimsiz yazılır
     n = _amount_number(value)
     low = 1
     while low * 10 <= n:
         low *= 10
     fmt = lambda x: f"{x:,}".replace(",", ".")  # noqa: E731
-    return f"{fmt(low)}-{fmt(low * 10)} {cur}".replace("₺", "TL").replace("€", "EUR").replace("£", "GBP")
+    out = f"{fmt(low)}-{fmt(low * 10)} {cur}".strip()
+    return out.replace("₺", "TL").replace("€", "EUR").replace("£", "GBP")
 
 
 # ---------- GPS koordinatı ----------
