@@ -3355,6 +3355,12 @@ mark.hl {
   color: var(--ok);
 }
 
+/* Kaçağa rağmen kaydedilen kopya: başarı yeşili yerine uyarı */
+.done-icon.warn {
+  background: var(--err-soft);
+  color: var(--err);
+}
+
 .done-list {
   display: grid;
   gap: 8px;
@@ -5627,6 +5633,11 @@ mark.hl {
   color: var(--ok);
   font-size: 12px;
   font-weight: 600;
+}
+
+.studio-done-badge.warn {
+  background: var(--err-soft);
+  color: var(--err);
 }
 
 .studio-home-tabs {

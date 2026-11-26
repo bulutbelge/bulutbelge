@@ -1557,7 +1557,7 @@ function App() {
     saveErrorNode: saveError ? (
       <KaydetmeHatasi ileti={saveError} busy={busy === "mask"} onAccept={source && !batchProgress ? () => void runMask(true) : undefined} />
     ) : null,
-    leftOpenNode: <LeftOpen findings={allFindings.filter((f) => excluded.has(f.id) && onKeptPage(f))} />,
+    leftOpenNode: <LeftOpen findings={allFindings.filter((f) => excluded.has(f.id) && onKeptPage(f))} leaked={done?.leaked} />,
   };
 
   let screen: ReactNode;
@@ -1707,8 +1707,8 @@ function App() {
           {preview(done.encrypted ? "maskeli" : "kaydedilen")}
         </section>
         <aside className="v2-side">
-          <span className="done-icon">
-            <Icon name="check" size={28} />
+          <span className={done.leaked?.length ? "done-icon warn" : "done-icon"}>
+            <Icon name={done.leaked?.length ? "alert" : "check"} size={28} />
           </span>
           <div>
             <h1 className="side-title">{sonucBasligi(t, done)}</h1>
@@ -1741,7 +1741,7 @@ function App() {
               </li>
             ))}
           </ul>
-          <LeftOpen findings={allFindings.filter((f) => excluded.has(f.id) && onKeptPage(f))} />
+          <LeftOpen findings={allFindings.filter((f) => excluded.has(f.id) && onKeptPage(f))} leaked={done?.leaked} />
           <PathChanged reason={done.changed} />
           <code className="path-line">{done.target}</code>
           <div className="side-spacer" />
@@ -2203,9 +2203,21 @@ function PasswordLine({
   );
 }
 
-/** Son kontrol: kopyada bilerek açık bırakılanlar (değer gösterilmez, yalnızca tür ve sayı). */
-function LeftOpen({ findings }: { findings: PdfFinding[] }) {
+/**
+ * Son kontrol: kopyada bilerek açık bırakılanlar (değer gösterilmez, yalnızca tür ve sayı).
+ * `leaked`: kaçağa rağmen kaydedildiyse kopyada hâlâ okunan türler; o zaman "hepsi maskelendi" denmez.
+ */
+function LeftOpen({ findings, leaked }: { findings: PdfFinding[]; leaked?: string[] }) {
   const t = useT();
+  if (leaked?.length) {
+    return (
+      <div className="left-open">
+        <b>
+          <Icon name="alert" size={15} /> {t("Kaçak denetiminin bulduğu değerler kopyada açık kaldı ({n} tür).", { n: leaked.length })}
+        </b>
+      </div>
+    );
+  }
   if (findings.length === 0) {
     return (
       <div className="left-open ok">

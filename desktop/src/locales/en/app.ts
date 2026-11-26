@@ -189,4 +189,5 @@ export default {
   "Kaçak nedeniyle kaydedilmeyen belgeyi açıp kontrol ettikten sonra tek başına “Yine de kaydet” ile kaydedebilirsiniz.":
     "You can open a document that was not saved because of a leak, check it, and save it on its own with “Save anyway”.",
   "Kaçağa rağmen kaydedildi": "Saved despite leak",
+  "Kaçak denetiminin bulduğu değerler kopyada açık kaldı ({n} tür).": "Values found by the leak check remain readable in the copy ({n} types).",
 } as Record<string, string>;

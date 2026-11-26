@@ -1632,11 +1632,16 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                     </button>
                   </div>
                 )}
-                {p.done && (
-                  <span className="studio-done-badge">
-                    <Icon name="check" size={14} /> {t("Güvenli kopya kaydedildi")}
-                  </span>
-                )}
+                {p.done &&
+                  (p.done.leaked?.length ? (
+                    <span className="studio-done-badge warn">
+                      <Icon name="alert" size={14} /> {sonucBasligi(t, p.done)}
+                    </span>
+                  ) : (
+                    <span className="studio-done-badge">
+                      <Icon name="check" size={14} /> {t("Güvenli kopya kaydedildi")}
+                    </span>
+                  ))}
               </>
             )}
             {panelPrefs.rightCollapsed && (
@@ -2077,8 +2082,8 @@ export function StudioWorkspace(p: SharedLayoutProps) {
         ) : p.done ? (
           <div className="studio-right-done">
             <div className="studio-done-head">
-              <span className="done-icon">
-                <Icon name="check" size={26} />
+              <span className={p.done.leaked?.length ? "done-icon warn" : "done-icon"}>
+                <Icon name={p.done.leaked?.length ? "alert" : "check"} size={26} />
               </span>
               <div>
                 <h2 className="side-title">{sonucBasligi(t, p.done)}</h2>
@@ -3172,8 +3177,8 @@ export function WizardWorkspace(p: SharedLayoutProps) {
         {step === 3 && p.done && (
           <div className="wizard-step3">
             <div className="wizard-done-banner">
-              <span className="done-icon">
-                <Icon name="check" size={28} />
+              <span className={p.done.leaked?.length ? "done-icon warn" : "done-icon"}>
+                <Icon name={p.done.leaked?.length ? "alert" : "check"} size={28} />
               </span>
               <div className="wizard-done-text">
                 <span className="wizard-badge ok">{t("Adım 3 Tamamlandı · Paylaşım Amacı: {amac}", { amac: currentPurpose.label })}</span>
