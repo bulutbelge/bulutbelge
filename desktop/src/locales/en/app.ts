@@ -190,4 +190,6 @@ export default {
     "You can open a document that was not saved because of a leak, check it, and save it on its own with “Save anyway”.",
   "Kaçağa rağmen kaydedildi": "Saved despite leak",
   "Kaçak denetiminin bulduğu değerler kopyada açık kaldı ({n} tür).": "Values found by the leak check remain readable in the copy ({n} types).",
+  "kaçağa rağmen kaydedildi": "saved despite leak",
+  "{n} kişisel bilgi maskelendi; kaçağa rağmen kaydedildi, {m} türde değer açık kaldı": "{n} personal items masked; saved despite leak, values of {m} types remain readable",
 } as Record<string, string>;

@@ -9089,3 +9089,9 @@ mark.hl {
 .save-error-confirm p {
   margin: 0;
 }
+
+/* Kaçağa rağmen kaydedilen belge: listede başarı yeşili yerine uyarı */
+.studio-doc-item.done.leaked .studio-doc-idx {
+  background: var(--err-soft);
+  color: var(--err);
+}

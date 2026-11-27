@@ -94,6 +94,8 @@ export interface Recent {
   folderRoot?: string;
   /** Ajan komutuyla yapılan işlemde ajanın adı (Son yapılanlar'da "Ajan" etiketi). */
   agent?: string;
+  /** Kaçağa rağmen kaydedildiyse kopyada açık kalan tür kodları (değer değil). */
+  leaked?: string[];
 }
 
 const RECENT_KEY = "bulutbelge.son-yapilanlar";
@@ -1089,6 +1091,7 @@ function App() {
         droppedPages: result.dropped,
         encrypted: result.encrypted,
         byType: buildRecentByType(allFindings, excluded, manual_areas.length + manual_cells.length),
+        leaked: result.leaked,
       };
       const next = [entry, ...recent.filter((x) => x.target !== result.target)];
       setRecent(next);
@@ -1658,7 +1661,7 @@ function App() {
                   <span className="recent-name" title={r.target}>
                     {splitPath(r.path).name}
                   </span>
-                  <span className="recent-meta">{t("{n} bilgi maskelendi", { n: r.count })}{r.agent ? ` · ${t("Ajan")} (${r.agent})` : ""}</span>
+                  <span className="recent-meta">{t("{n} bilgi maskelendi", { n: r.count })}{r.leaked?.length ? ` · ${t("kaçağa rağmen kaydedildi")}` : ""}{r.agent ? ` · ${t("Ajan")} (${r.agent})` : ""}</span>
                   <button className="link-btn" onClick={() => revealItemInDir(r.target)}>
                     {t("Klasörde göster")}
                   </button>

@@ -5,7 +5,7 @@ Tespit ve maskeleme işi `core/` kütüphanesine bırakılır; bu paket yalnızc
 protokolü ve komut yönlendirmesini taşır.
 """
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 import os
 import sys

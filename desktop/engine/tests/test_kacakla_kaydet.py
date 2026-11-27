@@ -96,3 +96,20 @@ def test_ajan_yolu_kacak_iznini_gecirmez():
     """Ajan komutu ve MCP maskelemeyi kendi kurduğu parametrelerle çağırır; izin alanı yok."""
     kaynak = inspect.getsource(ajan)
     assert "accept_leak" not in kaynak and "kacak_izni" not in kaynak
+
+
+def test_son_yapilanlar_kacak_turlerini_saklar_deger_saklamaz():
+    """Geçmiş kaydı kaçağa rağmen kayıtta yalnızca tür kodlarını tutar; tür kodu dışı girdi atılır."""
+    entry = {"path": "C:/x/a.docx", "target": "C:/x/a_maskeli.docx", "count": 1, "at": 1,
+             "leaked": ["tc_kimlik", TC, "Adres; DROP", "tc_kimlik"]}
+    out = settings.history_add({"entry": entry})
+    item = next(r for r in out if r["target"].endswith("a_maskeli.docx"))
+    assert item["leaked"] == ["tc_kimlik"]
+    db = (settings.data_dir() / settings.HISTORY_DB_FILE).read_bytes()
+    assert TC.encode() not in db
+
+
+def test_son_yapilanlar_kacaksiz_kayitta_alan_yok():
+    out = settings.history_add({"entry": {"path": "C:/x/b.docx", "target": "C:/x/b_maskeli.docx", "count": 2, "at": 2}})
+    item = next(r for r in out if r["target"].endswith("b_maskeli.docx"))
+    assert "leaked" not in item

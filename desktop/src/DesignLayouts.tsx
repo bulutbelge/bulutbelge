@@ -325,6 +325,8 @@ export interface SharedLayoutProps {
     folderRoot?: string;
     /** Ajan komutuyla yapılan işlemde ajanın adı. */
     agent?: string;
+    /** Kaçağa rağmen kaydedildiyse kopyada açık kalan tür kodları. */
+    leaked?: string[];
   }[];
   removeRecent?: (target: string | string[]) => void;
   clearRecent: () => void;
@@ -895,7 +897,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
       <li key={docPath}>
         <button
           type="button"
-          className={["studio-doc-item", isCurrent ? "active" : "", isDone ? "done" : "", isCurrent && (p.batchProgress || p.busy) ? "calisiyor" : ""].join(" ")}
+          className={["studio-doc-item", isCurrent ? "active" : "", isDone ? "done" : "", isDone && p.saved[docPath]?.leaked?.length ? "leaked" : "", isCurrent && (p.batchProgress || p.busy) ? "calisiyor" : ""].join(" ")}
           onClick={() => {
             setInspectedRecentTarget(null);
             if (docPath !== p.source) p.switchDoc(docPath);
@@ -903,7 +905,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
           title={rel ? `${rel}\n(${docPath})` : docPath}
         >
           <span className="studio-doc-idx">
-            {isDone ? <Icon name="check" size={12} /> : idx + 1}
+            {isDone ? <Icon name={p.saved[docPath]?.leaked?.length ? "alert" : "check"} size={12} /> : idx + 1}
           </span>
           <ExtBadge path={docPath} />
           <span className="studio-doc-meta">
@@ -1439,7 +1441,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                       <ExtBadge path={r.path} />
                       <div className="studio-recent-text">
                         <b title={r.target}>{splitPath(r.path).name}</b>
-                        <small>{t("{n} bilgi maskelendi", { n: r.count })}{r.agent ? ` · ${t("Ajan")} (${r.agent})` : ""}</small>
+                        <small>{t("{n} bilgi maskelendi", { n: r.count })}{r.leaked?.length ? ` · ${t("kaçağa rağmen kaydedildi")}` : ""}{r.agent ? ` · ${t("Ajan")} (${r.agent})` : ""}</small>
                       </div>
                       <button
                         type="button"
@@ -1517,6 +1519,7 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                 </b>
                 <span className="studio-stat-pill">
                   {t("{n} bilgi maskelendi", { n: inspectedRecent.count })}
+                  {inspectedRecent.leaked?.length ? ` · ${t("kaçağa rağmen kaydedildi")}` : ""}
                 </span>
               </>
             ) : p.source ? (
@@ -1848,7 +1851,11 @@ export function StudioWorkspace(p: SharedLayoutProps) {
                 </span>
                 <div>
                   <b>{splitPath(inspectedRecent.path).name}</b>
-                  <small>{t("{n} kişisel bilgi maskelendi ve doğrulandı", { n: inspectedRecent.count })}</small>
+                  <small>
+                    {inspectedRecent.leaked?.length
+                      ? t("{n} kişisel bilgi maskelendi; kaçağa rağmen kaydedildi, {m} türde değer açık kaldı", { n: inspectedRecent.count, m: inspectedRecent.leaked.length })
+                      : t("{n} kişisel bilgi maskelendi ve doğrulandı", { n: inspectedRecent.count })}
+                  </small>
                 </div>
               </div>
 

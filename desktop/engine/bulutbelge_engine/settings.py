@@ -15,6 +15,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 import sqlite3
 import tempfile
@@ -629,6 +630,9 @@ HISTORY_DB_FILE = "history.db"
 MAX_HISTORY = 50
 
 
+_TUR_KODU = re.compile(r"[a-z_]{1,30}")
+
+
 def _history_conn() -> sqlite3.Connection:
     db_path = data_dir() / HISTORY_DB_FILE
     conn = sqlite3.connect(str(db_path))
@@ -646,12 +650,18 @@ def _history_conn() -> sqlite3.Connection:
             by_type_json TEXT,
             folder_name TEXT,
             folder_root TEXT,
-            agent TEXT
+            agent TEXT,
+            leaked TEXT
         )
         """
     )
     try:
         conn.execute("ALTER TABLE recent_history ADD COLUMN agent TEXT")
+    except Exception:
+        pass
+    try:
+        # Kaçağa rağmen kaydedilen kopyada açık kalan tür kodları (değer değil), virgülle.
+        conn.execute("ALTER TABLE recent_history ADD COLUMN leaked TEXT")
     except Exception:
         pass
     try:
@@ -698,12 +708,12 @@ def _scrub_existing_history(conn: sqlite3.Connection) -> None:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO recent_history
-                (target, path, count, at, profile_name, dropped_pages, encrypted, by_type_json, folder_name, folder_root, agent)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (target, path, count, at, profile_name, dropped_pages, encrypted, by_type_json, folder_name, folder_root, agent, leaked)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     new["target"], new["path"], r["count"], r["at"], r["profile_name"], r["dropped_pages"],
-                    r["encrypted"], r["by_type_json"], new["folder_name"], new["folder_root"], r["agent"],
+                    r["encrypted"], r["by_type_json"], new["folder_name"], new["folder_root"], r["agent"], r["leaked"],
                 ),
             )
         conn.commit()
@@ -748,6 +758,11 @@ def _row_to_recent(row: sqlite3.Row) -> dict[str, Any]:
     try:
         if row["agent"]:
             item["agent"] = row["agent"]
+    except Exception:
+        pass
+    try:
+        if row["leaked"]:
+            item["leaked"] = row["leaked"].split(",")
     except Exception:
         pass
     return item
@@ -804,7 +819,15 @@ def _clean_history_entry(
     folder_root = scrub_path(str(raw["folderRoot"]).strip()) if raw.get("folderRoot") else None
     # Ajan komutuyla yapılan işlemde ajanın adı (arayüzde "Ajan" etiketi); kullanıcı işleminde boş.
     agent = str(raw["agent"]).strip()[:60] if raw.get("agent") else None
-    return (target, path, count, at, profile_name, dropped_pages, encrypted, by_type_json, folder_name, folder_root, agent)
+    # Kaçağa rağmen kaydedildiyse açık kalan türlerin kodları; yalnızca bilinen biçimde tür kodu kabul edilir.
+    leaked_raw = raw.get("leaked")
+    leaked_list = (
+        sorted({str(x) for x in leaked_raw if isinstance(x, str) and _TUR_KODU.fullmatch(x)})[:40]
+        if isinstance(leaked_raw, list)
+        else []
+    )
+    leaked = ",".join(leaked_list) or None
+    return (target, path, count, at, profile_name, dropped_pages, encrypted, by_type_json, folder_name, folder_root, agent, leaked)
 
 
 def history_add(params: dict[str, Any]) -> list[dict[str, Any]]:
@@ -822,8 +845,8 @@ def history_add(params: dict[str, Any]) -> list[dict[str, Any]]:
             conn.executemany(
                 """
                 INSERT OR REPLACE INTO recent_history
-                (target, path, count, at, profile_name, dropped_pages, encrypted, by_type_json, folder_name, folder_root, agent)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (target, path, count, at, profile_name, dropped_pages, encrypted, by_type_json, folder_name, folder_root, agent, leaked)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 cleaned,
             )
