@@ -272,14 +272,17 @@ function Winget-Kur([string] $Man, [string] $Ad, [int] $Sure = 300) {
 }
 
 Yaz ""
-Yaz "## winget yerel manifest (depodaki 0.1.1 manifesti: MSI, GitHub Releases'taki resmî dosyalar)"
+# Depodaki en yeni sürüm klasörü denenir (sürüm numarasına göre); kurulum dosyaları o sürümün GitHub Releases'taki
+# resmî MSI'larıdır, derleme koşusunun paketleri değil.
+$manKok = Join-Path $Depo 'desktop\packaging\winget\manifests\p\Proteksistem\BulutBelge'
+$man = Get-ChildItem $manKok -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1 -ExpandProperty FullName
+Yaz "## winget yerel manifest (depodaki en yeni manifest $(Split-Path $man -Leaf): MSI, GitHub Releases'taki resmî dosyalar)"
 $wg = Get-Command winget -ErrorAction SilentlyContinue
 if (-not $wg) {
     Yaz "winget bu makinede yok; bölüm atlandı."
 } else {
     Yaz "winget $(& $wg.Source --version)"
     & $wg.Source settings --enable LocalManifestFiles *> $null
-    $man = Join-Path $Depo 'desktop\packaging\winget\manifests\p\Proteksistem\BulutBelge\0.1.1'
     $v = & $wg.Source validate --manifest $man 2>&1 | Out-String
     Sonuc 'winget' 'Manifest doğrulaması' ($v -match 'succeeded') ($v.Trim() -replace '\s+', ' ')
     $r = Winget-Kur $man 'msi'

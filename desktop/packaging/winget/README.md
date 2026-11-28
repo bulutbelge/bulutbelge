@@ -34,7 +34,7 @@ komutunu PATH'e eklemez; komut satırı ve ajan kullanımı için NSIS kurulumu 
    (24 Kasım 2026 kararı); imzasız kurulum dosyaları winget deposunda yaygın, kesin sonuç ilk denetimde görülür. Windows 11 Akıllı Uygulama Denetimi açık makinelerde kurulum
    engellenebilir.
 
-Otomatik deneme: GitHub'da `Windows denemesi` iş akışı (bir Derleme koşusunun numarasıyla elle çalışır) bu
-manifesti temiz bir Windows makinesinde doğrular, sessiz kurar, `winget list` ile tanındığını ve kaldırmayı dener.
+Otomatik deneme: GitHub'da `Windows denemesi` iş akışı (bir Derleme koşusunun numarasıyla elle çalışır) depodaki
+en yeni sürüm klasörünü temiz bir Windows makinesinde doğrular, sessiz kurar, `winget list` ile tanındığını ve kaldırmayı dener.
 
 Dosyanın bütünlüğünü manifestteki SHA-256 korur.
